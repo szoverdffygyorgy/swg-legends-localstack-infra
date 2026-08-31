@@ -29,6 +29,17 @@ npm run tofu:destroy           # tear down all managed infrastructure
 # ─── TypeScript ──────────────────────────────────────────────────────
 npm run build                  # compile TypeScript to dist/
 npm run verify                 # smoke test: SDK talks to LocalStack
+
+# ─── Data Pipeline (Phase 1) ─────────────────────────────────────────
+npm run ingest                 # full pipeline: download -> parse -> DynamoDB -> S3
+npm run dashboard              # generate Bazaar Terminal HTML dashboard + open it
+
+# ─── Queries (Phase 1) ───────────────────────────────────────────────
+npm run query                                           # scan all resources
+npm run query -- --planet Tatooine                      # resources on Tatooine
+npm run query -- --class "Reactive Gas"                 # all Reactive Gas
+npm run query -- --planet Naboo --stat oq --min 800     # Naboo, OQ >= 800
+npm run query -- --stat oq --min 900                    # any resource with OQ >= 900
 ```
 
 ---

@@ -20,7 +20,11 @@
     "tofu:init": "tofu -chdir=tofu/phase1 init",
     "tofu:plan": "tofu -chdir=tofu/phase1 plan",
     "tofu:apply": "tofu -chdir=tofu/phase1 apply -auto-approve",
-    "tofu:destroy": "tofu -chdir=tofu/phase1 destroy -auto-approve"
+    "tofu:destroy": "tofu -chdir=tofu/phase1 destroy -auto-approve",
+
+    "ingest": "tsx src/ingest/pipeline.ts",
+    "query": "tsx src/query/find-resources.ts",
+    "dashboard": "tsx src/export/generate-dashboard.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.0.0",
