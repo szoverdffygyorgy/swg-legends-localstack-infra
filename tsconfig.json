@@ -1,0 +1,60 @@
+{
+  // TypeScript compiler configuration.
+  //
+  // The key question: "What JavaScript should TypeScript output?"
+  // We're targeting Node.js 22+ (you have v24), so we can use modern
+  // JS features directly. No need to downcompile to ES5 like you would
+  // for old browsers.
+  "compilerOptions": {
+    // ─── Output ─────────────────────────────────────────────────
+    // Where compiled .js files go. We keep source in src/, output in dist/.
+    "outDir": "dist",
+    "rootDir": "src",
+
+    // Target ES2022: enables top-level await, private class fields, etc.
+    // Node 22+ supports all of this natively.
+    "target": "ES2022",
+
+    // Use Node.js-style module resolution and ES modules.
+    // "NodeNext" means: follow Node's own rules for resolving imports,
+    // including package.json "exports" field, .js extensions, etc.
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+
+    // ─── Type checking ──────────────────────────────────────────
+    // "strict" enables all strict checks at once. This catches more
+    // bugs at compile time. Always use this for new projects.
+    "strict": true,
+
+    // Emit .d.ts declaration files alongside .js. Not strictly needed
+    // for a non-library project, but useful if you ever want to
+    // import types from compiled output.
+    "declaration": true,
+
+    // ─── Interop ────────────────────────────────────────────────
+    // Allow `import x from 'module'` for CommonJS modules that don't
+    // have a default export. Many npm packages still use CommonJS.
+    "esModuleInterop": true,
+
+    // Resolve .json imports (useful for reading config files).
+    "resolveJsonModule": true,
+
+    // Ensure each file can be transpiled independently.
+    // Required for tools like tsx that do single-file transpilation.
+    "isolatedModules": true,
+
+    // ─── Source maps ────────────────────────────────────────────
+    // Generate .js.map files so stack traces point to your .ts source
+    // instead of the compiled .js output.
+    "sourceMap": true,
+
+    // Skip type-checking node_modules (faster compilation).
+    "skipLibCheck": true,
+
+    // Explicitly include Node.js type definitions so globals like
+    // `process`, `console`, `Buffer`, `__dirname` etc. are recognized.
+    "types": ["node"]
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}
