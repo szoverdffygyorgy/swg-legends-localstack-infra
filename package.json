@@ -22,6 +22,8 @@
     "diff": "tsx src/ingest/diff.ts",
     "query": "tsx src/query/find-resources.ts",
     "events": "tsx src/query/event-log.ts",
+    "process:history": "tsx src/messaging/process-history.ts",
+    "process:alerts": "tsx src/messaging/process-alerts.ts",
     "dashboard": "tsx src/export/generate-dashboard.ts"
   },
   "dependencies": {

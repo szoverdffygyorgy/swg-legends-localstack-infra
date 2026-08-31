@@ -8,10 +8,9 @@
  * 4. Incremental update: add spawned, remove despawned
  *    (or full load if DynamoDB is empty -- first run)
  * 5. Log events to event-log table
- * 6. Archive raw XML to S3
- * 7. Print summary with spawn/despawn counts
- *
- * Phase 2 (Group K) will add: publish events to SNS after step 5.
+ * 6. Publish events to SNS (fans out to SQS queues)
+ * 7. Archive raw XML to S3
+ * 8. Print summary with spawn/despawn counts
  *
  * Run with: npm run ingest
  */
@@ -21,6 +20,7 @@ import { parseResourceExport } from "./parse-resources.js";
 import { loadResources, addResources, removeResources } from "./load-resources.js";
 import { diffResources } from "./diff.js";
 import { logEvents } from "./log-events.js";
+import { publishEvents } from "../messaging/publish-events.js";
 import { uploadToS3 } from "./upload-to-s3.js";
 
 async function main(): Promise<void> {
@@ -29,17 +29,17 @@ async function main(): Promise<void> {
   console.log("=== SWG Legends Resource Ingestion Pipeline ===\n");
 
   // Step 1: Download
-  console.log("[1/6] Downloading resource export...");
+  console.log("[1/7] Downloading resource export...");
   const xmlPath = await downloadResourceExport();
   console.log();
 
   // Step 2: Parse
-  console.log("[2/6] Parsing XML...");
+  console.log("[2/7] Parsing XML...");
   const resources = parseResourceExport(xmlPath);
   console.log(`  Parsed ${resources.length} resources\n`);
 
   // Step 3: Diff against current DynamoDB state
-  console.log("[3/6] Computing diff against DynamoDB...");
+  console.log("[3/7] Computing diff against DynamoDB...");
   const diff = await diffResources(resources);
   console.log();
 
@@ -47,10 +47,10 @@ async function main(): Promise<void> {
   const isFirstRun = diff.unchanged === 0 && diff.despawned.length === 0 && diff.spawned.length === resources.length;
 
   if (isFirstRun) {
-    console.log("[4/6] First run detected -- full load into DynamoDB...");
+    console.log("[4/7] First run detected -- full load into DynamoDB...");
     await loadResources(resources);
   } else {
-    console.log("[4/6] Incremental DynamoDB update...");
+    console.log("[4/7] Incremental DynamoDB update...");
     if (diff.spawned.length > 0) {
       await addResources(diff.spawned);
     }
@@ -64,12 +64,17 @@ async function main(): Promise<void> {
   console.log();
 
   // Step 5: Log events
-  console.log("[5/6] Logging events...");
+  console.log("[5/7] Logging events...");
   const eventsLogged = await logEvents(diff);
   console.log();
 
-  // Step 6: Archive to S3
-  console.log("[6/6] Archiving to S3...");
+  // Step 6: Publish events to SNS
+  console.log("[6/7] Publishing events to SNS...");
+  const eventsPublished = await publishEvents(diff);
+  console.log();
+
+  // Step 7: Archive to S3
+  console.log("[7/7] Archiving to S3...");
   const s3Key = await uploadToS3(xmlPath);
   console.log();
 
@@ -85,6 +90,7 @@ async function main(): Promise<void> {
   console.log(`  Despawned:          ${despawnedUniqueCount}`);
   console.log(`  Unchanged:          ${diff.unchanged}`);
   console.log(`  Events logged:      ${eventsLogged}`);
+  console.log(`  Events published:   ${eventsPublished}`);
   console.log(`  S3 archive:         s3://swg-legends-raw-exports/${s3Key}`);
   console.log(`  Time elapsed:       ${elapsed}s`);
   console.log();
