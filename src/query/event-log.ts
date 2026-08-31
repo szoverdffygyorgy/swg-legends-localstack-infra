@@ -73,16 +73,31 @@ function printEvents(events: EventLogItem[], date: string): void {
 
   for (const event of events) {
     const time = event.detectedAt.slice(11, 19); // HH:MM:SS
-    const color = event.eventType === "SPAWNED" ? GREEN : RED;
-    const typeStr = event.eventType === "SPAWNED" ? "+ SPAWNED" : "- DESPAWN";
+    let color: string;
+    let typeStr: string;
+
+    if (event.eventType === "SPAWNED") {
+      color = GREEN;
+      typeStr = "+ SPAWNED";
+    } else if (event.eventType === "DATA_ISSUE") {
+      color = YELLOW;
+      typeStr = "! ISSUE";
+    } else {
+      color = RED;
+      typeStr = "- DESPAWN";
+    }
+
+    const detailStr = event.eventType === "DATA_ISSUE"
+      ? `${YELLOW}${(event as EventLogItem & { issue?: string }).issue ?? "unknown issue"}${RESET}`
+      : `${DIM}${event.statSummary}${RESET}`;
 
     const row = [
       `${DIM}${time}${RESET}`,
       `${color}${typeStr.padEnd(typeWidth)}${RESET}`,
-      event.resourceName.padEnd(nameWidth),
+      `${event.resourceName.padEnd(nameWidth)}`,
       `${DIM}${event.resourceClass.padEnd(classWidth)}${RESET}`,
       `${DIM}${event.planets.padEnd(planetWidth)}${RESET}`,
-      `${DIM}${event.statSummary}${RESET}`,
+      detailStr,
     ].join("  ");
 
     console.log(`  ${row}`);
@@ -90,11 +105,17 @@ function printEvents(events: EventLogItem[], date: string): void {
 
   const spawned = events.filter((e) => e.eventType === "SPAWNED").length;
   const despawned = events.filter((e) => e.eventType === "DESPAWNED").length;
+  const issues = events.filter((e) => e.eventType === "DATA_ISSUE").length;
 
   console.log();
-  console.log(
-    `  ${GREEN}${spawned} spawned${RESET}, ${RED}${despawned} despawned${RESET} (${events.length} total events)\n`
-  );
+  const parts = [
+    `${GREEN}${spawned} spawned${RESET}`,
+    `${RED}${despawned} despawned${RESET}`,
+  ];
+  if (issues > 0) {
+    parts.push(`${YELLOW}${issues} data issue(s)${RESET}`);
+  }
+  console.log(`  ${parts.join(", ")} (${events.length} total events)\n`);
 }
 
 async function main(): Promise<void> {

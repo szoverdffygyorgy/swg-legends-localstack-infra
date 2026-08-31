@@ -28,10 +28,12 @@
     "alerts:list": "tsx src/alerts/list-rules.ts",
     "alerts:remove": "tsx src/alerts/remove-rule.ts",
     "alerts:history": "tsx src/alerts/history.ts",
+    "lambda:build": "tsx scripts/build-lambdas.ts",
     "dashboard": "tsx src/export/generate-dashboard.ts"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.0.0",
+    "@aws-sdk/client-lambda": "^3.1121.0",
     "@aws-sdk/client-s3": "^3.0.0",
     "@aws-sdk/client-sns": "^3.1121.0",
     "@aws-sdk/client-sqs": "^3.1121.0",

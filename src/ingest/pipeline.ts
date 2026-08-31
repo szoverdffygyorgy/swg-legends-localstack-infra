@@ -35,12 +35,13 @@ async function main(): Promise<void> {
 
   // Step 2: Parse
   console.log("[2/7] Parsing XML...");
-  const resources = parseResourceExport(xmlPath);
-  console.log(`  Parsed ${resources.length} resources\n`);
+  const { resources, dataIssues } = parseResourceExport(xmlPath);
+  console.log(`  Parsed ${resources.length} resources` +
+    (dataIssues.length > 0 ? `, ${dataIssues.length} data issue(s)` : "") + "\n");
 
   // Step 3: Diff against current DynamoDB state
   console.log("[3/7] Computing diff against DynamoDB...");
-  const diff = await diffResources(resources);
+  const diff = await diffResources(resources, dataIssues);
   console.log();
 
   // Step 4: Update DynamoDB
@@ -89,6 +90,7 @@ async function main(): Promise<void> {
   console.log(`  Spawned:            ${diff.spawned.length}`);
   console.log(`  Despawned:          ${despawnedUniqueCount}`);
   console.log(`  Unchanged:          ${diff.unchanged}`);
+  console.log(`  Data issues:        ${diff.dataIssues.length}`);
   console.log(`  Events logged:      ${eventsLogged}`);
   console.log(`  Events published:   ${eventsPublished}`);
   console.log(`  S3 archive:         s3://swg-legends-raw-exports/${s3Key}`);

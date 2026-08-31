@@ -36,7 +36,8 @@ function statSummaryFromItem(item: ResourceItem): string {
  * Returns the number of events written.
  */
 export async function logEvents(diff: DiffResult): Promise<number> {
-  const totalEvents = diff.spawned.length + new Set(diff.despawned.map((i) => i.resourceId)).size;
+  const despawnedCount = new Set(diff.despawned.map((i) => i.resourceId)).size;
+  const totalEvents = diff.spawned.length + despawnedCount + diff.dataIssues.length;
   if (totalEvents === 0) {
     console.log("  No events to log");
     return 0;
@@ -80,6 +81,22 @@ export async function logEvents(diff: DiffResult): Promise<number> {
       planets: item.allPlanets,
       statSummary: statSummaryFromItem(item),
       detectedAt: timestamp,
+    });
+  }
+
+  // Data quality issue events
+  for (const issue of diff.dataIssues) {
+    items.push({
+      date: dateStr,
+      sk: `${timestamp}#${issue.resourceId}`,
+      eventType: "DATA_ISSUE",
+      resourceId: issue.resourceId,
+      resourceName: issue.resourceName,
+      resourceClass: issue.resourceClass,
+      planets: issue.rawPlanets,
+      statSummary: "",
+      detectedAt: timestamp,
+      issue: issue.issue,
     });
   }
 

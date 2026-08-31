@@ -131,12 +131,37 @@ export interface DiffResult {
 
   /** Count of resources that exist in both (no change) */
   unchanged: number;
+
+  /** Resources with data quality problems (e.g., empty planet names) */
+  dataIssues: DataIssue[];
+}
+
+// ─── Data quality issues ─────────────────────────────────────────────
+// Tracked when the XML export contains resources with invalid data
+// (e.g., missing planet names). These are logged to the event-log table
+// as DATA_ISSUE events instead of being silently dropped.
+
+export interface DataIssue {
+  /** SWGAide resource ID */
+  resourceId: string;
+
+  /** Resource name */
+  resourceName: string;
+
+  /** Resource class */
+  resourceClass: string;
+
+  /** Description of what went wrong */
+  issue: string;
+
+  /** Raw planet data from the XML (for debugging) */
+  rawPlanets: string;
 }
 
 // ─── Event log item ──────────────────────────────────────────────────
 // Stored in the event-log DynamoDB table. One item per spawn/despawn event.
 
-export type EventType = "SPAWNED" | "DESPAWNED";
+export type EventType = "SPAWNED" | "DESPAWNED" | "DATA_ISSUE";
 
 export interface EventLogItem {
   /** Partition key: date string (e.g., "2026-08-31") */
@@ -159,4 +184,7 @@ export interface EventLogItem {
 
   /** ISO timestamp of when the event was detected */
   detectedAt: string;
+
+  /** Description of the data issue (only for DATA_ISSUE events) */
+  issue?: string;
 }

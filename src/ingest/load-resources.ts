@@ -35,6 +35,12 @@ const BATCH_SIZE = 25;
  * Convert an SWGResource into one or more ResourceItems (one per planet).
  */
 export function denormalize(resource: SWGResource): ResourceItem[] {
+  // Safety net: skip resources with no valid planets
+  // (should be caught by the parser, but just in case)
+  if (resource.planets.length === 0) {
+    return [];
+  }
+
   const baseItem = {
     resourceId: resource.resourceId,
     resourceName: resource.resourceName,
@@ -216,8 +222,8 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     console.log("=== Load Resources into DynamoDB ===\n");
     console.log(`  Parsing: ${filePath}`);
 
-    const resources = parseResourceExport(filePath);
-    console.log(`  Parsed ${resources.length} resources\n`);
+    const { resources, dataIssues } = parseResourceExport(filePath);
+    console.log(`  Parsed ${resources.length} resources, ${dataIssues.length} data issues\n`);
 
     const itemCount = await loadResources(resources);
     console.log(`\nDone: ${itemCount} items written to DynamoDB`);

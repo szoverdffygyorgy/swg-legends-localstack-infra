@@ -11,7 +11,7 @@ All AWS services run locally via **LocalStack** (Docker). Zero cloud costs. The 
 - **Phase 0: Foundation** -- COMPLETE
 - **Phase 1: Storage (S3 + DynamoDB)** -- COMPLETE
 - **Phase 2: Messaging (SQS + SNS)** -- COMPLETE
-- Phase 3: Compute (Lambda) -- planned
+- **Phase 3: Compute (Lambda)** -- COMPLETE
 - Phase 4: API Layer (API Gateway) -- planned
 - Phase 5: Orchestration (Step Functions) -- planned
 - Phase 6: Events & Monitoring (EventBridge + CloudWatch) -- planned
@@ -60,6 +60,11 @@ swg-legends-localstack-infra/
       sqs.tf                  # history-recorder + alert-evaluator queues + DLQs
       subscriptions.tf        # SNS -> SQS fan-out wiring + queue policies
       dynamodb.tf             # event-log + alert-rules tables
+    phase3/
+      main.tf                 # Phase 3 provider config
+      iam.tf                  # Lambda execution role + DynamoDB/SQS/Logs policies
+      lambda.tf               # alert-evaluator + history-recorder Lambda definitions
+      event-sources.tf        # SQS -> Lambda event source mappings
   src/
     config.ts                 # Shared AWS client factories + constants
     types.ts                  # SWGResource, ResourceItem, DiffResult, EventLogItem types
@@ -86,7 +91,15 @@ swg-legends-localstack-infra/
       event-log.ts            # Query spawn/despawn events by date
     export/
       generate-dashboard.ts   # Generate Bazaar Terminal HTML dashboard
+    lambda/
+      alert-evaluator/
+        handler.ts            # Lambda: evaluate spawns against alert rules
+      history-recorder/
+        handler.ts            # Lambda: record despawns to history table
+  scripts/
+    build-lambdas.ts          # esbuild bundle + zip + deploy Lambdas to LocalStack
   data/                       # Downloaded XML + generated dashboard (gitignored)
+  dist/lambda/                # Built Lambda zip files (gitignored)
 ```
 
 ## Teaching Approach
@@ -109,6 +122,7 @@ swg-legends-localstack-infra/
 | `npm run alerts:add -- --name X --class Y` | Add an alert rule |
 | `npm run alerts:list` | Show all alert rules |
 | `npm run alerts:history` | Show fired alert history |
+| `npm run lambda:build` | Build + bundle + deploy Lambda functions to LocalStack |
 | `npm run dashboard` | Generate Bazaar Terminal HTML dashboard |
 | `npm run localstack:up` | Start LocalStack container |
 | `npm run localstack:reset` | Wipe all data and restart fresh |

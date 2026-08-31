@@ -46,9 +46,14 @@ npm run query -- --stat oq --min 900                    # any resource with OQ >
 npm run events                                          # today's spawn/despawn events
 npm run events -- --date 2026-08-31                     # events for specific date
 
-# ─── Queue Consumers (Phase 2) ──────────────────────────────────────
+# ─── Queue Consumers (Phase 2, manual fallback) ─────────────────────
+# Note: Phase 3 Lambda auto-processes these queues. Manual consumers
+# are kept for debugging when you need step-by-step visibility.
 npm run process:history        # drain history queue -> resource-history table
 npm run process:alerts         # drain alerts queue -> check rules -> fire alerts
+
+# ─── Lambda (Phase 3) ───────────────────────────────────────────────
+npm run lambda:build           # build + bundle + deploy Lambda functions to LocalStack
 
 # ─── Alert Rules (Phase 2) ──────────────────────────────────────────
 npm run alerts:add -- --name "Good Copper" --class Copper --stat oq --min 800

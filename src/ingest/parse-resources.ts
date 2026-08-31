@@ -34,13 +34,20 @@
 
 import { readFileSync } from "node:fs";
 import { XMLParser } from "fast-xml-parser";
-import type { SWGResource, ResourceStats, StatKey } from "../types.js";
+import type { SWGResource, ResourceStats, StatKey, DataIssue } from "../types.js";
 import { ALL_STAT_KEYS } from "../types.js";
+
+export interface ParseResult {
+  resources: SWGResource[];
+  dataIssues: DataIssue[];
+}
 
 /**
  * Parse an SWGAide XML export file into SWGResource objects.
+ * Resources with data quality issues (e.g., empty planet names) are
+ * separated into the dataIssues array instead of being silently dropped.
  */
-export function parseResourceExport(filePath: string): SWGResource[] {
+export function parseResourceExport(filePath: string): ParseResult {
   const xml = readFileSync(filePath, "utf-8");
 
   // Configure the XML parser:
@@ -62,6 +69,7 @@ export function parseResourceExport(filePath: string): SWGResource[] {
   const rawResources = parsed.resource_data.resources.resource;
 
   const resources: SWGResource[] = [];
+  const dataIssues: DataIssue[] = [];
 
   for (const raw of rawResources) {
     // Parse stats: only include stats that are present for this resource class
@@ -74,27 +82,52 @@ export function parseResourceExport(filePath: string): SWGResource[] {
       }
     }
 
-    // Parse planets: extract the name from each planet element
-    const planets: string[] = [];
+    // Parse planets: extract the name from each planet element,
+    // filtering out empty/null planet names (data quality issue)
+    const rawPlanetNames: string[] = [];
+    const validPlanets: string[] = [];
     if (raw.planets?.planet) {
       for (const p of raw.planets.planet) {
-        planets.push(p.name);
+        const name = p.name;
+        rawPlanetNames.push(String(name ?? ""));
+        if (name && typeof name === "string" && name.trim()) {
+          validPlanets.push(name.trim());
+        }
       }
     }
 
+    const resourceId = String(raw.swgaide_id);
+    const resourceName = raw.name;
+    const resourceClass = raw.type;
+
+    // Check for data quality issues
+    if (validPlanets.length === 0) {
+      dataIssues.push({
+        resourceId,
+        resourceName,
+        resourceClass,
+        issue: "empty planet name",
+        rawPlanets: rawPlanetNames.join(", ") || "(none)",
+      });
+      console.log(
+        `  Warning: ${resourceName} (${resourceClass}) [ID: ${resourceId}] has no valid planets -- logged as data issue`
+      );
+      continue; // Skip this resource, don't add to valid resources
+    }
+
     resources.push({
-      resourceId: String(raw.swgaide_id),
-      resourceName: raw.name,
-      resourceClass: raw.type,
+      resourceId,
+      resourceName,
+      resourceClass,
       resourceClassId: raw.swgaide_type_id,
       stats,
-      planets,
+      planets: validPlanets,
       availableTimestamp: Number(raw.available_timestamp),
       availableBy: raw.available_by ?? "Unknown",
     });
   }
 
-  return resources;
+  return { resources, dataIssues };
 }
 
 // Allow running directly: npx tsx src/ingest/parse-resources.ts
@@ -103,9 +136,9 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   console.log(`=== Parse SWGAide Resource Export ===\n`);
   console.log(`  Parsing: ${filePath}`);
 
-  const resources = parseResourceExport(filePath);
+  const { resources, dataIssues } = parseResourceExport(filePath);
 
-  console.log(`  Parsed ${resources.length} resources\n`);
+  console.log(`  Parsed ${resources.length} resources, ${dataIssues.length} data issues\n`);
 
   // Print summary stats
   const planets = new Set(resources.flatMap((r) => r.planets));

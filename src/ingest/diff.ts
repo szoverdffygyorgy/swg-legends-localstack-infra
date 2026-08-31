@@ -15,7 +15,7 @@
 
 import { ScanCommand } from "@aws-sdk/lib-dynamodb";
 import { createDocClient, RESOURCES_TABLE } from "../config.js";
-import type { SWGResource, ResourceItem, DiffResult } from "../types.js";
+import type { SWGResource, ResourceItem, DiffResult, DataIssue } from "../types.js";
 
 /**
  * Fetch all unique resource IDs from DynamoDB.
@@ -53,7 +53,8 @@ async function fetchCurrentResourceIds(): Promise<Map<string, ResourceItem[]>> {
  * Compare parsed XML resources against the current DynamoDB state.
  */
 export async function diffResources(
-  xmlResources: SWGResource[]
+  xmlResources: SWGResource[],
+  dataIssues: DataIssue[] = []
 ): Promise<DiffResult> {
   console.log("  Fetching current resource IDs from DynamoDB...");
   const currentById = await fetchCurrentResourceIds();
@@ -82,10 +83,11 @@ export async function diffResources(
   const unchanged = xmlIds.size - spawned.length;
 
   console.log(
-    `  Diff: ${spawned.length} spawned, ${despawnedIds.size} despawned, ${unchanged} unchanged`
+    `  Diff: ${spawned.length} spawned, ${despawnedIds.size} despawned, ${unchanged} unchanged` +
+    (dataIssues.length > 0 ? `, ${dataIssues.length} data issue(s)` : "")
   );
 
-  return { spawned, despawned, unchanged };
+  return { spawned, despawned, unchanged, dataIssues };
 }
 
 // Allow running directly: npm run diff
@@ -101,11 +103,11 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     console.log();
 
     console.log("[2/3] Parsing XML...");
-    const resources = parseResourceExport(xmlPath);
-    console.log(`  Parsed ${resources.length} resources\n`);
+    const { resources, dataIssues } = parseResourceExport(xmlPath);
+    console.log(`  Parsed ${resources.length} resources, ${dataIssues.length} data issues\n`);
 
     console.log("[3/3] Computing diff...");
-    const diff = await diffResources(resources);
+    const diff = await diffResources(resources, dataIssues);
     console.log();
 
     if (diff.spawned.length > 0) {
