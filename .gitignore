@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+
+# TypeScript build output
+dist/
+
+# OpenTofu / Terraform
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.backup
+*.tfvars
+!*.tfvars.example
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Downloaded data (large XML/gzip exports from SWGAide)
+data/
+
+# Corporate proxy CA certificates (machine-specific)
+certs/
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+*.log
