@@ -30,8 +30,9 @@ npm run tofu:destroy           # tear down all managed infrastructure
 npm run build                  # compile TypeScript to dist/
 npm run verify                 # smoke test: SDK talks to LocalStack
 
-# ─── Data Pipeline (Phase 1) ─────────────────────────────────────────
-npm run ingest                 # full pipeline: download -> parse -> DynamoDB -> S3
+# ─── Data Pipeline (Phase 1+2) ───────────────────────────────────────
+npm run ingest                 # full pipeline: download -> diff -> DynamoDB -> events -> SNS -> S3
+npm run diff                   # show spawn/despawn diff without modifying anything
 npm run dashboard              # generate Bazaar Terminal HTML dashboard + open it
 
 # ─── Queries (Phase 1) ───────────────────────────────────────────────
@@ -40,6 +41,22 @@ npm run query -- --planet Tatooine                      # resources on Tatooine
 npm run query -- --class "Reactive Gas"                 # all Reactive Gas
 npm run query -- --planet Naboo --stat oq --min 800     # Naboo, OQ >= 800
 npm run query -- --stat oq --min 900                    # any resource with OQ >= 900
+
+# ─── Events (Phase 2) ───────────────────────────────────────────────
+npm run events                                          # today's spawn/despawn events
+npm run events -- --date 2026-08-31                     # events for specific date
+
+# ─── Queue Consumers (Phase 2) ──────────────────────────────────────
+npm run process:history        # drain history queue -> resource-history table
+npm run process:alerts         # drain alerts queue -> check rules -> fire alerts
+
+# ─── Alert Rules (Phase 2) ──────────────────────────────────────────
+npm run alerts:add -- --name "Good Copper" --class Copper --stat oq --min 800
+npm run alerts:add -- --name "Any Reactive Gas" --class "Reactive Gas"
+npm run alerts:list            # show all alert rules
+npm run alerts:remove -- --id r_1234567890   # remove a rule by ID
+npm run alerts:history         # show all fired alerts
+npm run alerts:history -- --last 24          # fired alerts from last 24 hours
 ```
 
 ---

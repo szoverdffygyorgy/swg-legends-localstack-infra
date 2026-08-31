@@ -10,7 +10,7 @@ All AWS services run locally via **LocalStack** (Docker). Zero cloud costs. The 
 
 - **Phase 0: Foundation** -- COMPLETE
 - **Phase 1: Storage (S3 + DynamoDB)** -- COMPLETE
-- Phase 2: Messaging (SQS + SNS) -- planned
+- **Phase 2: Messaging (SQS + SNS)** -- COMPLETE
 - Phase 3: Compute (Lambda) -- planned
 - Phase 4: API Layer (API Gateway) -- planned
 - Phase 5: Orchestration (Step Functions) -- planned
@@ -54,18 +54,36 @@ swg-legends-localstack-infra/
       main.tf                 # Phase 1 provider config
       s3.tf                   # swg-legends-raw-exports bucket
       dynamodb.tf             # resources + resource-history tables
+    phase2/
+      main.tf                 # Phase 2 provider config
+      sns.tf                  # resource-spawned + resource-despawned topics
+      sqs.tf                  # history-recorder + alert-evaluator queues + DLQs
+      subscriptions.tf        # SNS -> SQS fan-out wiring + queue policies
+      dynamodb.tf             # event-log + alert-rules tables
   src/
     config.ts                 # Shared AWS client factories + constants
-    types.ts                  # SWGResource, ResourceItem, ResourceStats types
+    types.ts                  # SWGResource, ResourceItem, DiffResult, EventLogItem types
     verify-localstack.ts      # Phase 0 smoke test
     ingest/
       download.ts             # Download + decompress SWGAide XML export
       parse-resources.ts      # Parse XML -> SWGResource[]
+      diff.ts                 # Compare XML against DynamoDB, produce spawn/despawn lists
+      load-resources.ts       # Full load + incremental add/remove for DynamoDB
+      log-events.ts           # Write spawn/despawn events to event-log table
       upload-to-s3.ts         # Archive raw XML to S3
-      load-resources.ts       # Denormalize + batch write to DynamoDB
-      pipeline.ts             # Orchestrate full ingestion flow
+      pipeline.ts             # Orchestrate full ingestion flow (7 steps)
+    messaging/
+      publish-events.ts       # Publish spawn/despawn events to SNS topics
+      process-history.ts      # SQS consumer: despawn events -> resource-history table
+      process-alerts.ts       # SQS consumer: spawn events -> check alert rules -> fire alerts
+    alerts/
+      add-rule.ts             # Add a new alert rule
+      list-rules.ts           # List all alert rules
+      remove-rule.ts          # Remove an alert rule by ID
+      history.ts              # View fired alert history
     query/
       find-resources.ts       # Query by planet/class/stat with CLI args
+      event-log.ts            # Query spawn/despawn events by date
     export/
       generate-dashboard.ts   # Generate Bazaar Terminal HTML dashboard
   data/                       # Downloaded XML + generated dashboard (gitignored)
@@ -82,12 +100,18 @@ swg-legends-localstack-infra/
 
 | Script | What it does |
 |--------|-------------|
-| `npm run ingest` | Full pipeline: download XML -> parse -> DynamoDB -> S3 |
+| `npm run ingest` | Full pipeline: download -> diff -> DynamoDB -> events -> SNS -> S3 |
+| `npm run diff` | Show spawn/despawn diff without modifying anything |
 | `npm run query -- --planet Tatooine` | Query resources by planet/class/stat |
+| `npm run events` | Show today's spawn/despawn events |
+| `npm run process:history` | Drain history SQS queue -> resource-history table |
+| `npm run process:alerts` | Drain alerts SQS queue -> check rules -> fire alerts |
+| `npm run alerts:add -- --name X --class Y` | Add an alert rule |
+| `npm run alerts:list` | Show all alert rules |
+| `npm run alerts:history` | Show fired alert history |
 | `npm run dashboard` | Generate Bazaar Terminal HTML dashboard |
 | `npm run localstack:up` | Start LocalStack container |
 | `npm run localstack:reset` | Wipe all data and restart fresh |
-| `npm run tofu:apply` | Apply Phase 1 infrastructure |
 
 ## Known Future Additions
 

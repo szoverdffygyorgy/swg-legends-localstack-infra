@@ -24,6 +24,10 @@
     "events": "tsx src/query/event-log.ts",
     "process:history": "tsx src/messaging/process-history.ts",
     "process:alerts": "tsx src/messaging/process-alerts.ts",
+    "alerts:add": "tsx src/alerts/add-rule.ts",
+    "alerts:list": "tsx src/alerts/list-rules.ts",
+    "alerts:remove": "tsx src/alerts/remove-rule.ts",
+    "alerts:history": "tsx src/alerts/history.ts",
     "dashboard": "tsx src/export/generate-dashboard.ts"
   },
   "dependencies": {
