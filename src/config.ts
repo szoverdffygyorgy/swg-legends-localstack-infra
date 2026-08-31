@@ -135,3 +135,19 @@ export function createSQSClient(): SQSClient {
     credentials,
   });
 }
+
+// ─── Phase 4: API Gateway helpers ────────────────────────────────────
+// The API base URL is constructed after `tofu apply` outputs the API ID.
+// For scripts that need the URL dynamically, we provide a helper that
+// reads it from the OpenTofu output. For the test script, the API ID
+// can be passed as an environment variable.
+
+/**
+ * Construct the LocalStack API Gateway base URL from an API ID.
+ *
+ * LocalStack format: http://localhost:4566/restapis/{apiId}/{stage}/_user_request_
+ * Real AWS format:   https://{apiId}.execute-api.{region}.amazonaws.com/{stage}
+ */
+export function apiBaseUrl(apiId: string, stage = "dev"): string {
+  return `${LOCALSTACK_ENDPOINT}/restapis/${apiId}/${stage}/_user_request_`;
+}

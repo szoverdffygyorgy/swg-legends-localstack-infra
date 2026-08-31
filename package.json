@@ -29,7 +29,12 @@
     "alerts:remove": "tsx src/alerts/remove-rule.ts",
     "alerts:history": "tsx src/alerts/history.ts",
     "lambda:build": "tsx scripts/build-lambdas.ts",
-    "dashboard": "tsx src/export/generate-dashboard.ts"
+    "dashboard": "tsx src/export/generate-dashboard.ts",
+    "tofu:init:phase4": "tofu -chdir=tofu/phase4 init",
+    "tofu:plan:phase4": "tofu -chdir=tofu/phase4 plan",
+    "tofu:apply:phase4": "tofu -chdir=tofu/phase4 apply -auto-approve",
+    "tofu:destroy:phase4": "tofu -chdir=tofu/phase4 destroy -auto-approve",
+    "api:test": "tsx src/api/test-api.ts"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.0.0",

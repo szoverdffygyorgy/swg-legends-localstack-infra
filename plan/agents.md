@@ -12,7 +12,7 @@ All AWS services run locally via **LocalStack** (Docker). Zero cloud costs. The 
 - **Phase 1: Storage (S3 + DynamoDB)** -- COMPLETE
 - **Phase 2: Messaging (SQS + SNS)** -- COMPLETE
 - **Phase 3: Compute (Lambda)** -- COMPLETE
-- Phase 4: API Layer (API Gateway) -- planned
+- **Phase 4: API Layer (API Gateway)** -- COMPLETE
 - Phase 5: Orchestration (Step Functions) -- planned
 - Phase 6: Events & Monitoring (EventBridge + CloudWatch) -- planned
 
@@ -65,6 +65,12 @@ swg-legends-localstack-infra/
       iam.tf                  # Lambda execution role + DynamoDB/SQS/Logs policies
       lambda.tf               # alert-evaluator + history-recorder Lambda definitions
       event-sources.tf        # SQS -> Lambda event source mappings
+    phase4/
+      main.tf                 # Phase 4 provider config
+      iam.tf                  # API Lambda execution role + DynamoDB/Logs policies
+      lambda.tf               # api-get-resources + api-get-events + api-alerts Lambdas
+      api-gateway.tf          # REST API, resources, methods, integrations, deployment, stage
+      outputs.tf              # API base URL + example curl commands
   src/
     config.ts                 # Shared AWS client factories + constants
     types.ts                  # SWGResource, ResourceItem, DiffResult, EventLogItem types
@@ -96,6 +102,14 @@ swg-legends-localstack-infra/
         handler.ts            # Lambda: evaluate spawns against alert rules
       history-recorder/
         handler.ts            # Lambda: record despawns to history table
+      api-get-resources/
+        handler.ts            # Lambda: GET /resources, GET /resources/{id}
+      api-get-events/
+        handler.ts            # Lambda: GET /events
+      api-alerts/
+        handler.ts            # Lambda: /alerts/rules CRUD + /alerts/history
+    api/
+      test-api.ts             # Smoke test for all API endpoints
   scripts/
     build-lambdas.ts          # esbuild bundle + zip + deploy Lambdas to LocalStack
   data/                       # Downloaded XML + generated dashboard (gitignored)
@@ -126,11 +140,19 @@ swg-legends-localstack-infra/
 | `npm run dashboard` | Generate Bazaar Terminal HTML dashboard |
 | `npm run localstack:up` | Start LocalStack container |
 | `npm run localstack:reset` | Wipe all data and restart fresh |
+| `npm run api:test` | Smoke test all API Gateway endpoints |
+| `npm run tofu:init:phase4` | Initialize Phase 4 OpenTofu |
+| `npm run tofu:apply:phase4` | Apply Phase 4 infrastructure |
 
 ## Known Future Additions
 
 - **Resource class hierarchy** -- SWG has a deep tree (e.g., Mineral > Metal > Non-Ferrous Metal > Aluminum > Link-Steel Aluminum). Currently not in our data model. Needed for Phase 3 schematic matching. Plan: static TypeScript mapping file.
 - **Schematics data** -- Crafting recipes from SWGAide's `schematics_unity.xml.gz`. Deferred until Phase 3.
+
+## Known LocalStack Limitations
+
+- **API Gateway v2 (HTTP API)** requires a paid LocalStack license. Phase 4 uses REST API v1 (`aws_api_gateway_*`), which is available on the free Hobby tier.
+- **MOCK integration responses** (for OPTIONS/CORS preflight) fail on LocalStack. CORS is handled by Lambda response headers instead (`Access-Control-Allow-Origin: *` on every response).
 
 ## Full Details
 
