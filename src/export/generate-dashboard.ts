@@ -718,17 +718,24 @@ function renderEventLog() {
 
   const rows = EVENTS.slice(0, 20).map(e => {
     const time = e.detectedAt ? e.detectedAt.slice(11, 19) : '';
-    const isSpawn = e.eventType === 'SPAWNED';
-    const color = isSpawn ? '#33cc33' : '#cc4444';
-    const symbol = isSpawn ? '+' : '-';
-    const label = isSpawn ? 'SPAWNED' : 'DESPAWN';
+    let color, symbol, label, detail;
+    if (e.eventType === 'SPAWNED') {
+      color = '#33cc33'; symbol = '+'; label = 'SPAWNED';
+      detail = e.statSummary || '';
+    } else if (e.eventType === 'DATA_ISSUE') {
+      color = '#ffcc00'; symbol = '!'; label = 'ISSUE';
+      detail = e.issue || 'unknown data issue';
+    } else {
+      color = '#cc4444'; symbol = '-'; label = 'DESPAWN';
+      detail = e.statSummary || '';
+    }
     return '<div style="margin-bottom: 4px; font-size: 12px;">' +
       '<span style="color: #334433;">' + time + '</span> ' +
       '<span style="color: ' + color + '; font-weight: bold;">' + symbol + ' ' + label + '</span> ' +
       '<span style="color: #44dd44;">' + e.resourceName + '</span> ' +
       '<span style="color: #669966;">(' + e.resourceClass + ')</span> ' +
       '<span style="color: #334433;">[' + e.planets + ']</span>' +
-      '<div style="color: #334433; margin-left: 70px; font-size: 11px;">' + e.statSummary + '</div>' +
+      '<div style="color: ' + (e.eventType === 'DATA_ISSUE' ? '#ffcc00' : '#334433') + '; margin-left: 70px; font-size: 11px;">' + detail + '</div>' +
       '</div>';
   }).join('');
 
