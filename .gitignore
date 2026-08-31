@@ -6,11 +6,12 @@ dist/
 
 # OpenTofu / Terraform
 .terraform/
-.terraform.lock.hcl
 *.tfstate
 *.tfstate.backup
 *.tfvars
 !*.tfvars.example
+# Note: .terraform.lock.hcl is intentionally NOT ignored.
+# It pins provider versions for reproducibility (like package-lock.json).
 
 # Environment and secrets
 .env
