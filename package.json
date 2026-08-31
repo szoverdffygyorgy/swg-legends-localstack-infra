@@ -2,6 +2,7 @@
   "name": "swg-legends-localstack-infra",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "description": "SWG Legends crafting & resource intelligence — local AWS infrastructure learning project",
   "scripts": {
     "build": "tsc",
