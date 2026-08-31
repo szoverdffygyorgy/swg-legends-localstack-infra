@@ -34,7 +34,7 @@ const BATCH_SIZE = 25;
 /**
  * Convert an SWGResource into one or more ResourceItems (one per planet).
  */
-function denormalize(resource: SWGResource): ResourceItem[] {
+export function denormalize(resource: SWGResource): ResourceItem[] {
   const baseItem = {
     resourceId: resource.resourceId,
     resourceName: resource.resourceName,
@@ -123,6 +123,87 @@ export async function loadResources(
   }
 
   return written;
+}
+
+/**
+ * Add only new resources (incremental insert).
+ * Used by the diff-based pipeline instead of full reload.
+ * Returns the number of items written.
+ */
+export async function addResources(
+  resources: SWGResource[]
+): Promise<number> {
+  if (resources.length === 0) return 0;
+
+  const docClient = createDocClient();
+  const allItems: ResourceItem[] = resources.flatMap(denormalize);
+
+  console.log(
+    `  Adding ${resources.length} new resources (${allItems.length} items)`
+  );
+
+  let written = 0;
+  for (let i = 0; i < allItems.length; i += BATCH_SIZE) {
+    const batch = allItems.slice(i, i + BATCH_SIZE);
+
+    await docClient.send(
+      new BatchWriteCommand({
+        RequestItems: {
+          [RESOURCES_TABLE]: batch.map((item) => ({
+            PutRequest: { Item: item },
+          })),
+        },
+      })
+    );
+
+    written += batch.length;
+  }
+
+  console.log(`  Added ${written} items`);
+  return written;
+}
+
+/**
+ * Remove despawned resources from DynamoDB.
+ * Takes the raw ResourceItem[] from the diff (includes all planet rows).
+ * Returns the number of items deleted.
+ */
+export async function removeResources(
+  items: ResourceItem[]
+): Promise<number> {
+  if (items.length === 0) return 0;
+
+  const docClient = createDocClient();
+  const uniqueIds = new Set(items.map((i) => i.resourceId));
+
+  console.log(
+    `  Removing ${uniqueIds.size} despawned resources (${items.length} items)`
+  );
+
+  let deleted = 0;
+  for (let i = 0; i < items.length; i += BATCH_SIZE) {
+    const batch = items.slice(i, i + BATCH_SIZE);
+
+    await docClient.send(
+      new BatchWriteCommand({
+        RequestItems: {
+          [RESOURCES_TABLE]: batch.map((item) => ({
+            DeleteRequest: {
+              Key: {
+                resourceId: item.resourceId,
+                planet: item.planet,
+              },
+            },
+          })),
+        },
+      })
+    );
+
+    deleted += batch.length;
+  }
+
+  console.log(`  Deleted ${deleted} items`);
+  return deleted;
 }
 
 // Allow running directly: npx tsx src/ingest/load-resources.ts

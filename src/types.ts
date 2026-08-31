@@ -117,3 +117,46 @@ export interface ResourceItem {
   sr?: number;
   ut?: number;
 }
+
+// ─── Diff result ─────────────────────────────────────────────────────
+// Produced by the diff engine when comparing the fresh XML export
+// against the current DynamoDB state.
+
+export interface DiffResult {
+  /** Resources in the XML but not in DynamoDB (newly spawned) */
+  spawned: SWGResource[];
+
+  /** Resources in DynamoDB but not in the XML (despawned) */
+  despawned: ResourceItem[];
+
+  /** Count of resources that exist in both (no change) */
+  unchanged: number;
+}
+
+// ─── Event log item ──────────────────────────────────────────────────
+// Stored in the event-log DynamoDB table. One item per spawn/despawn event.
+
+export type EventType = "SPAWNED" | "DESPAWNED";
+
+export interface EventLogItem {
+  /** Partition key: date string (e.g., "2026-08-31") */
+  date: string;
+
+  /** Sort key: "timestamp#resourceId" for ordering + uniqueness */
+  sk: string;
+
+  /** The event type */
+  eventType: EventType;
+
+  /** Resource details */
+  resourceId: string;
+  resourceName: string;
+  resourceClass: string;
+  planets: string;
+
+  /** Key stats as a summary string (e.g., "OQ:978 DR:448") */
+  statSummary: string;
+
+  /** ISO timestamp of when the event was detected */
+  detectedAt: string;
+}
