@@ -18,6 +18,8 @@
 import { S3Client } from "@aws-sdk/client-s3";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
+import { SNSClient } from "@aws-sdk/client-sns";
+import { SQSClient } from "@aws-sdk/client-sqs";
 
 // ─── Shared configuration ────────────────────────────────────────────
 
@@ -87,3 +89,49 @@ export const RESOURCE_HISTORY_TABLE = "resource-history";
 /** SWGAide export URL for SWG Legends (server 138) current resources */
 export const SWGAIDE_RESOURCES_URL =
   "https://swgaide.com/pub/exports/currentresources_138.xml.gz";
+
+// ─── Phase 2: Messaging constants ────────────────────────────────────
+// LocalStack uses account ID 000000000000 for all resources.
+// ARNs and URLs follow the same format as real AWS.
+
+const ACCOUNT_ID = "000000000000";
+
+/** SNS topic ARN for resource spawn events */
+export const RESOURCE_SPAWNED_TOPIC_ARN =
+  `arn:aws:sns:${AWS_REGION}:${ACCOUNT_ID}:resource-spawned`;
+
+/** SNS topic ARN for resource despawn events */
+export const RESOURCE_DESPAWNED_TOPIC_ARN =
+  `arn:aws:sns:${AWS_REGION}:${ACCOUNT_ID}:resource-despawned`;
+
+/** SQS queue URL for history recording (despawn events) */
+export const HISTORY_RECORDER_QUEUE_URL =
+  `http://sqs.${AWS_REGION}.localhost.localstack.cloud:4566/${ACCOUNT_ID}/history-recorder`;
+
+/** SQS queue URL for alert evaluation (spawn events) */
+export const ALERT_EVALUATOR_QUEUE_URL =
+  `http://sqs.${AWS_REGION}.localhost.localstack.cloud:4566/${ACCOUNT_ID}/alert-evaluator`;
+
+/** DynamoDB table name for spawn/despawn event log */
+export const EVENT_LOG_TABLE = "event-log";
+
+/** DynamoDB table name for alert rules and fired alerts */
+export const ALERT_RULES_TABLE = "alert-rules";
+
+// ─── Phase 2: Client factories ───────────────────────────────────────
+
+export function createSNSClient(): SNSClient {
+  return new SNSClient({
+    endpoint: LOCALSTACK_ENDPOINT,
+    region: AWS_REGION,
+    credentials,
+  });
+}
+
+export function createSQSClient(): SQSClient {
+  return new SQSClient({
+    endpoint: LOCALSTACK_ENDPOINT,
+    region: AWS_REGION,
+    credentials,
+  });
+}

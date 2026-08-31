@@ -7,34 +7,32 @@
   "scripts": {
     "build": "tsc",
     "verify": "tsx src/verify-localstack.ts",
-
     "localstack:up": "docker compose up -d",
     "localstack:down": "docker compose down",
     "localstack:status": "curl -s http://localhost:4566/_localstack/health | python3 -m json.tool",
     "localstack:logs": "docker logs -f localstack",
     "localstack:reset": "docker compose down -v && docker compose up -d",
-
     "aws:s3:ls": "aws --profile localstack s3 ls",
     "aws:dynamo:tables": "aws --profile localstack dynamodb list-tables",
-
     "tofu:init": "tofu -chdir=tofu/phase1 init",
     "tofu:plan": "tofu -chdir=tofu/phase1 plan",
     "tofu:apply": "tofu -chdir=tofu/phase1 apply -auto-approve",
     "tofu:destroy": "tofu -chdir=tofu/phase1 destroy -auto-approve",
-
     "ingest": "tsx src/ingest/pipeline.ts",
     "query": "tsx src/query/find-resources.ts",
     "dashboard": "tsx src/export/generate-dashboard.ts"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.0.0",
     "@aws-sdk/client-dynamodb": "^3.0.0",
+    "@aws-sdk/client-s3": "^3.0.0",
+    "@aws-sdk/client-sns": "^3.1121.0",
+    "@aws-sdk/client-sqs": "^3.1121.0",
     "@aws-sdk/lib-dynamodb": "^3.0.0",
     "fast-xml-parser": "^5.0.0"
   },
   "devDependencies": {
-    "typescript": "^5.0.0",
+    "@types/node": "^22.0.0",
     "tsx": "^4.0.0",
-    "@types/node": "^22.0.0"
+    "typescript": "^5.0.0"
   }
 }
