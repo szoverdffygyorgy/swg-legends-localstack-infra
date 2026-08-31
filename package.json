@@ -16,10 +16,10 @@
     "aws:s3:ls": "aws --profile localstack s3 ls",
     "aws:dynamo:tables": "aws --profile localstack dynamodb list-tables",
 
-    "tofu:init": "tofu -chdir=tofu init",
-    "tofu:plan": "tofu -chdir=tofu plan",
-    "tofu:apply": "tofu -chdir=tofu apply -auto-approve",
-    "tofu:destroy": "tofu -chdir=tofu destroy -auto-approve"
+    "tofu:init": "tofu -chdir=tofu/phase1 init",
+    "tofu:plan": "tofu -chdir=tofu/phase1 plan",
+    "tofu:apply": "tofu -chdir=tofu/phase1 apply -auto-approve",
+    "tofu:destroy": "tofu -chdir=tofu/phase1 destroy -auto-approve"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.0.0",
