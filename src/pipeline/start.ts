@@ -21,16 +21,16 @@ function getStateMachineArn(): string {
   }
 
   try {
-    return execSync("tofu -chdir=tofu/phase5 output -raw state_machine_arn", {
+    return execSync("tofu -chdir=tofu/orchestration output -raw state_machine_arn", {
       encoding: "utf-8",
       stdio: ["pipe", "pipe", "pipe"],
     }).trim();
   } catch {
     console.error(
       "Failed to read state machine ARN from tofu output.\n" +
-      "Make sure Phase 5 infrastructure is provisioned:\n" +
-      "  npm run tofu:init:phase5\n" +
-      "  npm run tofu:apply:phase5\n"
+      "Make sure orchestration module infrastructure is provisioned:\n" +
+      "  npm run tofu:init:orchestration\n" +
+      "  npm run tofu:apply:orchestration\n"
     );
     process.exit(1);
   }

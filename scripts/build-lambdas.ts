@@ -28,7 +28,7 @@ const LOCALSTACK_ENDPOINT = "http://localhost:4566";
 const AWS_REGION = "us-east-1";
 
 const LAMBDAS = [
-  // Phase 3: SQS-triggered Lambdas
+  // Compute: SQS-triggered Lambdas
   {
     name: "alert-evaluator",
     entry: "src/lambda/alert-evaluator/handler.ts",
@@ -37,7 +37,7 @@ const LAMBDAS = [
     name: "history-recorder",
     entry: "src/lambda/history-recorder/handler.ts",
   },
-  // Phase 4: API Gateway Lambdas
+  // API: API Gateway Lambdas
   {
     name: "api-get-resources",
     entry: "src/lambda/api-get-resources/handler.ts",
@@ -50,7 +50,7 @@ const LAMBDAS = [
     name: "api-alerts",
     entry: "src/lambda/api-alerts/handler.ts",
   },
-  // Phase 5: Pipeline Step Functions Lambdas
+  // Orchestration: Pipeline Step Functions Lambdas
   {
     name: "pipeline-download",
     entry: "src/lambda/pipeline-download/handler.ts",

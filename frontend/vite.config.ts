@@ -7,7 +7,7 @@ import { execSync } from "node:child_process";
 function getApiBaseUrl(): string {
   try {
     const url = execSync(
-      "tofu -chdir=../tofu/phase4 output -raw api_base_url",
+      "tofu -chdir=../tofu/api output -raw api_base_url",
       { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] }
     ).trim();
     console.log(`  API proxy target: ${url}`);
@@ -15,7 +15,7 @@ function getApiBaseUrl(): string {
   } catch {
     console.warn(
       "  Warning: Could not read API base URL from tofu output.\n" +
-        "  Make sure Phase 4 is provisioned. Using fallback."
+        "  Make sure API module is provisioned. Using fallback."
     );
     return "http://localhost:4566/restapis/UNKNOWN/dev/_user_request_";
   }

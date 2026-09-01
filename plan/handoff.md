@@ -4,7 +4,7 @@
 
 A local AWS infrastructure playground for learning AWS services by building a real, useful tool: a crafting and resource intelligence system for the Star Wars Galaxies (SWG) Legends server (NGE). All AWS services are emulated locally via LocalStack -- zero cloud costs.
 
-**All 6 phases are complete**, plus a React frontend. The system ingests real SWG resource data from swgaide.com, stores it in DynamoDB, publishes spawn/despawn events via SNS/SQS, evaluates alert rules via Lambda, exposes everything through a REST API, orchestrates the ingestion pipeline via Step Functions, schedules automatic runs via EventBridge, monitors health via CloudWatch, and presents it all in a browser-based React dashboard.
+**All 6 modules are complete**, plus a React frontend. The system ingests real SWG resource data from swgaide.com, stores it in DynamoDB, publishes spawn/despawn events via SNS/SQS, evaluates alert rules via Lambda, exposes everything through a REST API, orchestrates the ingestion pipeline via Step Functions, schedules automatic runs via EventBridge, monitors health via CloudWatch, and presents it all in a browser-based React dashboard.
 
 ## Decisions Made (Before Development)
 
@@ -16,12 +16,12 @@ A local AWS infrastructure playground for learning AWS services by building a re
 | Local AWS emulation | LocalStack (Docker) | Free tier covers all services we need |
 | Game / theme | SWG Legends (NGE server) | User is semi-active player, closest to their heart |
 | Data source | swgaide.com XML exports | Real player-reported resource data for SWG Legends |
-| Approach | Phase-by-phase | User wants to learn incrementally, discuss each phase before moving on |
+| Approach | Module-by-module | User wants to learn incrementally, discuss each module before moving on |
 | Teaching style | "Why before how" | User wants to understand tradeoffs and when to use what |
 
 ## Decisions Made (During Development)
 
-These decisions were made as we built each phase, based on what we learned along the way:
+These decisions were made as we built each module, based on what we learned along the way:
 
 | Decision | Choice | Reasoning |
 |----------|--------|-----------|
@@ -31,7 +31,7 @@ These decisions were made as we built each phase, based on what we learned along
 | Step Functions data passing | S3 as inter-step scratch space | Parsed resource array (~575 items) exceeds the 256 KB payload limit between states. Standard pattern. |
 | Pipeline schedule | `rate(2 hours)` | SWGAide data doesn't change that frequently. 30 min was overkill for a learning project. |
 | Corporate proxy in Lambda | `NODE_TLS_REJECT_UNAUTHORIZED=0` | Lambda containers can't reach swgaide.com through the corporate proxy. Dev-only workaround. |
-| Frontend framework | React + Vite (not Next.js) | Next.js is a backend framework -- it would duplicate or replace the API Gateway + Lambda backend we spent 4 phases building. React SPA keeps the frontend as a pure consumer of the REST API. |
+| Frontend framework | React + Vite (not Next.js) | Next.js is a backend framework -- it would duplicate or replace the API Gateway + Lambda backend we spent 4 modules building. React SPA keeps the frontend as a pure consumer of the REST API. |
 | Frontend color theme | SWG NGE in-game UI palette | Dark navy backgrounds, pale blue text, warm gold accents. Comfortable for extended use, themed to the game. |
 | S3 static website hosting | Separate bucket `swg-legends-frontend` | Demonstrates a real AWS hosting pattern (S3 + public read policy). Deployed via a TypeScript build script. |
 
@@ -75,14 +75,14 @@ Primary data source. Aggregates resource data from SWGAide app, swgcraft.org, an
 - ~575 active resources at any given time
 - Active reporter community (resources are player-reported)
 
-## What Was Built: Phase Summary
+## What Was Built: Module Summary
 
-### Phase 0: Foundation -- COMPLETE
+### Foundation -- COMPLETE
 **AWS Services:** None (setup only)
 
 Set up the local development environment: Docker Compose for LocalStack, OpenTofu provider configuration, TypeScript project with AWS SDK v3, npm scripts, AWS CLI profile for LocalStack.
 
-### Phase 1: Storage (S3 + DynamoDB) -- COMPLETE
+### Storage (S3 + DynamoDB) -- COMPLETE
 **AWS Services:** S3, DynamoDB
 
 - **S3 bucket** (`swg-legends-raw-exports`): stores timestamped XML export archives
@@ -95,7 +95,7 @@ Set up the local development environment: Docker Compose for LocalStack, OpenTof
 
 *Deferred: schematics table (not needed without schematic matching features)*
 
-### Phase 2: Messaging (SQS + SNS) -- COMPLETE
+### Messaging (SQS + SNS) -- COMPLETE
 **AWS Services:** SQS, SNS
 
 - **SNS topics:** `resource-spawned`, `resource-despawned` (broadcast events)
@@ -107,7 +107,7 @@ Set up the local development environment: Docker Compose for LocalStack, OpenTof
 - **Diff engine:** compare fresh XML against DynamoDB, detect new/removed resources
 - **Alert rules CLI:** `npm run alerts:add`, `alerts:list`, `alerts:remove`, `alerts:history`
 
-### Phase 3: Compute (Lambda) -- COMPLETE
+### Compute (Lambda) -- COMPLETE
 **AWS Services:** Lambda, IAM
 
 - **Lambda functions:**
@@ -119,7 +119,7 @@ Set up the local development environment: Docker Compose for LocalStack, OpenTof
 
 *Deferred: quality scorer Lambda, "best resource for schematic" Lambda (requires schematics data)*
 
-### Phase 4: API Layer (API Gateway) -- COMPLETE
+### API (API Gateway) -- COMPLETE
 **AWS Services:** API Gateway (REST API v1)
 
 - **REST API** with 7 endpoints:
@@ -136,7 +136,7 @@ Set up the local development environment: Docker Compose for LocalStack, OpenTof
 - **Smoke test suite** (`npm run api:test`): 15 tests covering all endpoints, validation, error cases
 - **Deployment + Stage:** `dev` stage with manual deployment
 
-### Phase 5: Orchestration (Step Functions) -- COMPLETE
+### Orchestration (Step Functions) -- COMPLETE
 **AWS Services:** Step Functions
 
 - **State machine** (`swg-legends-ingestion-pipeline`) with 7 steps:
@@ -151,7 +151,7 @@ Set up the local development environment: Docker Compose for LocalStack, OpenTof
 - **Parallel state:** LogEvents and PublishSNS run simultaneously
 - **CLI scripts:** `npm run pipeline:start`, `npm run pipeline:status`
 
-### Phase 6: Events & Monitoring (EventBridge + CloudWatch) -- COMPLETE
+### Monitoring (EventBridge + CloudWatch) -- COMPLETE
 **AWS Services:** EventBridge, CloudWatch, SNS
 
 - **EventBridge scheduled rule:** triggers Step Functions pipeline every 2 hours
@@ -173,18 +173,18 @@ Set up the local development environment: Docker Compose for LocalStack, OpenTof
 
 ## AWS Services Used
 
-| Service | Purpose | Phase |
-|---------|---------|-------|
-| S3 | Raw XML archives, inter-step pipeline data, frontend hosting | 1, 5, Frontend |
-| DynamoDB | Resources, resource history, event log, alert rules | 1, 2 |
-| SNS | Spawn/despawn event broadcasting, pipeline failure alerts | 2, 6 |
-| SQS | Message queuing with DLQs for reliable processing | 2 |
-| Lambda | SQS consumers, API handlers, pipeline steps (12 total) | 3, 4, 5 |
-| IAM | Execution roles for Lambda, Step Functions, EventBridge | 3, 4, 5, 6 |
-| API Gateway | REST API with 7 HTTP endpoints | 4 |
-| Step Functions | Ingestion pipeline orchestration (state machine) | 5 |
-| EventBridge | Scheduled pipeline execution, failure detection | 6 |
-| CloudWatch | Dashboard, metrics, alarms | 6 |
+| Service | Purpose | Module |
+|---------|---------|--------|
+| S3 | Raw XML archives, inter-step pipeline data, frontend hosting | Storage, Orchestration, Frontend |
+| DynamoDB | Resources, resource history, event log, alert rules | Storage, Messaging |
+| SNS | Spawn/despawn event broadcasting, pipeline failure alerts | Messaging, Monitoring |
+| SQS | Message queuing with DLQs for reliable processing | Messaging |
+| Lambda | SQS consumers, API handlers, pipeline steps (12 total) | Compute, API, Orchestration |
+| IAM | Execution roles for Lambda, Step Functions, EventBridge | Compute, API, Orchestration, Monitoring |
+| API Gateway | REST API with 7 HTTP endpoints | API |
+| Step Functions | Ingestion pipeline orchestration (state machine) | Orchestration |
+| EventBridge | Scheduled pipeline execution, failure detection | Monitoring |
+| CloudWatch | Dashboard, metrics, alarms | Monitoring |
 
 ## Infrastructure Summary
 
@@ -200,8 +200,8 @@ Set up the local development environment: Docker Compose for LocalStack, OpenTof
 | EventBridge rules | 2 (schedule + failure detection) |
 | CloudWatch dashboards | 1 |
 | CloudWatch alarms | 1 |
-| IAM roles | 4 (Phase 3 Lambda, Phase 4 API Lambda, Phase 5 pipeline Lambda + SFN) |
-| OpenTofu state directories | 7 (phase1-6 + frontend) |
+| IAM roles | 4 (Compute Lambda, API Lambda, Orchestration pipeline Lambda + SFN) |
+| OpenTofu state directories | 7 (storage, messaging, compute, api, orchestration, monitoring + frontend) |
 
 ## Quick Start from Scratch
 
@@ -212,12 +212,12 @@ If LocalStack data is wiped or you're starting fresh:
 npm run localstack:up
 
 # 2. Provision all infrastructure (order matters)
-tofu -chdir=tofu/phase1 init && tofu -chdir=tofu/phase1 apply -auto-approve
-tofu -chdir=tofu/phase2 init && tofu -chdir=tofu/phase2 apply -auto-approve
-tofu -chdir=tofu/phase3 init && tofu -chdir=tofu/phase3 apply -auto-approve
-tofu -chdir=tofu/phase4 init && tofu -chdir=tofu/phase4 apply -auto-approve
-tofu -chdir=tofu/phase5 init && tofu -chdir=tofu/phase5 apply -auto-approve
-tofu -chdir=tofu/phase6 init && tofu -chdir=tofu/phase6 apply -auto-approve
+tofu -chdir=tofu/storage init && tofu -chdir=tofu/storage apply -auto-approve
+tofu -chdir=tofu/messaging init && tofu -chdir=tofu/messaging apply -auto-approve
+tofu -chdir=tofu/compute init && tofu -chdir=tofu/compute apply -auto-approve
+tofu -chdir=tofu/api init && tofu -chdir=tofu/api apply -auto-approve
+tofu -chdir=tofu/orchestration init && tofu -chdir=tofu/orchestration apply -auto-approve
+tofu -chdir=tofu/monitoring init && tofu -chdir=tofu/monitoring apply -auto-approve
 tofu -chdir=tofu/frontend init && tofu -chdir=tofu/frontend apply -auto-approve
 
 # 3. Build and deploy all Lambda functions
@@ -242,7 +242,7 @@ npm run frontend:dev       # Start React dev server at http://localhost:3000
 
 ## Recommended First Message in New Session
 
-> Read plan/handoff.md and plan/agents.md for full project context. The system is fully built (Phases 0-6 + React frontend). LocalStack should be running. [Describe what you want to do or change.]
+> Read plan/handoff.md and plan/agents.md for full project context. The system is fully built (all 6 modules + React frontend). LocalStack should be running. [Describe what you want to do or change.]
 
 ## User Context
 

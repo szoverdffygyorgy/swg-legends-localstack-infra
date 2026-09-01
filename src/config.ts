@@ -93,7 +93,7 @@ export const RESOURCE_CLASSES_TABLE = "resource-classes";
 export const SWGAIDE_RESOURCES_URL =
   "https://swgaide.com/pub/exports/currentresources_138.xml.gz";
 
-// ─── Phase 2: Messaging constants ────────────────────────────────────
+// ─── Messaging constants ─────────────────────────────────────────────
 // LocalStack uses account ID 000000000000 for all resources.
 // ARNs and URLs follow the same format as real AWS.
 
@@ -121,7 +121,7 @@ export const EVENT_LOG_TABLE = "event-log";
 /** DynamoDB table name for alert rules and fired alerts */
 export const ALERT_RULES_TABLE = "alert-rules";
 
-// ─── Phase 2: Client factories ───────────────────────────────────────
+// ─── Messaging client factories ──────────────────────────────────────
 
 export function createSNSClient(): SNSClient {
   return new SNSClient({
@@ -139,7 +139,7 @@ export function createSQSClient(): SQSClient {
   });
 }
 
-// ─── Phase 4: API Gateway helpers ────────────────────────────────────
+// ─── API Gateway helpers ─────────────────────────────────────────────
 // The API base URL is constructed after `tofu apply` outputs the API ID.
 // For scripts that need the URL dynamically, we provide a helper that
 // reads it from the OpenTofu output. For the test script, the API ID

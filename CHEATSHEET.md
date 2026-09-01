@@ -21,41 +21,41 @@ npm run aws:s3:ls              # list all S3 buckets
 npm run aws:dynamo:tables      # list all DynamoDB tables
 
 # ─── OpenTofu ────────────────────────────────────────────────────────
-npm run tofu:init              # download providers (run once after clone)
-npm run tofu:plan              # dry run — show what would change
-npm run tofu:apply             # apply changes to LocalStack
-npm run tofu:destroy           # tear down all managed infrastructure
+npm run tofu:init:storage      # download providers (run once after clone)
+npm run tofu:plan:storage      # dry run — show what would change
+npm run tofu:apply:storage     # apply changes to LocalStack
+npm run tofu:destroy:storage   # tear down all managed infrastructure
 
 # ─── TypeScript ──────────────────────────────────────────────────────
 npm run build                  # compile TypeScript to dist/
 npm run verify                 # smoke test: SDK talks to LocalStack
 
-# ─── Data Pipeline (Phase 1+2) ───────────────────────────────────────
+# ─── Data Pipeline (Storage + Messaging) ─────────────────────────────
 npm run ingest                 # full pipeline: download -> diff -> DynamoDB -> events -> SNS -> S3
 npm run diff                   # show spawn/despawn diff without modifying anything
 npm run dashboard              # generate Bazaar Terminal HTML dashboard + open it
 
-# ─── Queries (Phase 1) ───────────────────────────────────────────────
+# ─── Queries (Storage) ───────────────────────────────────────────────
 npm run query                                           # scan all resources
 npm run query -- --planet Tatooine                      # resources on Tatooine
 npm run query -- --class "Reactive Gas"                 # all Reactive Gas
 npm run query -- --planet Naboo --stat oq --min 800     # Naboo, OQ >= 800
 npm run query -- --stat oq --min 900                    # any resource with OQ >= 900
 
-# ─── Events (Phase 2) ───────────────────────────────────────────────
+# ─── Events (Messaging) ─────────────────────────────────────────────
 npm run events                                          # today's spawn/despawn events
 npm run events -- --date 2026-08-31                     # events for specific date
 
-# ─── Queue Consumers (Phase 2, manual fallback) ─────────────────────
-# Note: Phase 3 Lambda auto-processes these queues. Manual consumers
+# ─── Queue Consumers (Messaging, manual fallback) ───────────────────
+# Note: Compute Lambda auto-processes these queues. Manual consumers
 # are kept for debugging when you need step-by-step visibility.
 npm run process:history        # drain history queue -> resource-history table
 npm run process:alerts         # drain alerts queue -> check rules -> fire alerts
 
-# ─── Lambda (Phase 3) ───────────────────────────────────────────────
+# ─── Lambda (Compute) ───────────────────────────────────────────────
 npm run lambda:build           # build + bundle + deploy Lambda functions to LocalStack
 
-# ─── Alert Rules (Phase 2) ──────────────────────────────────────────
+# ─── Alert Rules (Messaging) ────────────────────────────────────────
 npm run alerts:add -- --name "Good Copper" --class Copper --stat oq --min 800
 npm run alerts:add -- --name "Any Reactive Gas" --class "Reactive Gas"
 npm run alerts:list            # show all alert rules
@@ -138,7 +138,7 @@ aws --profile localstack dynamodb delete-item \
   --key '{"pk": {"S": "some-key"}}'
 ```
 
-### SQS (message queues) — Phase 2
+### SQS (message queues) — Messaging
 
 ```bash
 # List all queues
@@ -159,7 +159,7 @@ aws --profile localstack sqs purge-queue \
   --queue-url http://localhost:4566/000000000000/QUEUE_NAME
 ```
 
-### SNS (pub/sub notifications) — Phase 2
+### SNS (pub/sub notifications) — Messaging
 
 ```bash
 # List all topics
@@ -174,7 +174,7 @@ aws --profile localstack sns publish \
 aws --profile localstack sns list-subscriptions
 ```
 
-### Lambda (serverless functions) — Phase 3
+### Lambda (serverless functions) — Compute
 
 ```bash
 # List all functions
@@ -213,10 +213,10 @@ tofu -chdir=tofu state list
 # Show details of a specific resource
 tofu -chdir=tofu state show aws_s3_bucket.RESOURCE_NAME
 
-# Per-phase commands (Phase 1 example)
-tofu -chdir=tofu/phase1 init
-tofu -chdir=tofu/phase1 plan
-tofu -chdir=tofu/phase1 apply
+# Per-module commands (Storage example)
+tofu -chdir=tofu/storage init
+tofu -chdir=tofu/storage plan
+tofu -chdir=tofu/storage apply
 ```
 
 ---

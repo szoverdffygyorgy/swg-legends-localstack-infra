@@ -1,5 +1,5 @@
 /**
- * API smoke test — verify all Phase 4 endpoints are working.
+ * API smoke test — verify all API endpoints are working.
  *
  * This script hits every endpoint and reports pass/fail results.
  * It also serves as documentation of the API: every endpoint,
@@ -7,7 +7,7 @@
  *
  * Prerequisites:
  *   1. LocalStack running (npm run localstack:up)
- *   2. Phase 1-4 infrastructure provisioned (tofu apply)
+ *   2. Storage, messaging, compute, and API modules provisioned (tofu apply)
  *   3. Data ingested (npm run ingest)
  *   4. Lambdas built and deployed (npm run lambda:build)
  *
@@ -37,7 +37,7 @@ function getApiId(): string {
   }
 
   try {
-    const output = execSync("tofu -chdir=tofu/phase4 output -raw api_id", {
+    const output = execSync("tofu -chdir=tofu/api output -raw api_id", {
       encoding: "utf-8",
       stdio: ["pipe", "pipe", "pipe"],
     }).trim();
@@ -45,9 +45,9 @@ function getApiId(): string {
   } catch {
     console.error(
       `${RED}Failed to read API ID from tofu output.${RESET}\n` +
-      `Make sure Phase 4 infrastructure is provisioned:\n` +
-      `  npm run tofu:init:phase4\n` +
-      `  npm run tofu:apply:phase4\n` +
+      `Make sure API module infrastructure is provisioned:\n` +
+      `  npm run tofu:init:api\n` +
+      `  npm run tofu:apply:api\n` +
       `\nOr set API_ID environment variable manually.\n`
     );
     process.exit(1);

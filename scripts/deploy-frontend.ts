@@ -72,13 +72,13 @@ async function main(): Promise<void> {
   let apiBaseUrl: string;
   try {
     apiBaseUrl = execSync(
-      "tofu -chdir=tofu/phase4 output -raw api_base_url",
+      "tofu -chdir=tofu/api output -raw api_base_url",
       { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] }
     ).trim();
   } catch {
     console.error(
       "Failed to read API base URL from tofu output.\n" +
-      "Make sure Phase 4 is provisioned: npm run tofu:apply:phase4\n"
+      "Make sure API module is provisioned: npm run tofu:apply:api\n"
     );
     process.exit(1);
   }

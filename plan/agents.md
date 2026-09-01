@@ -8,15 +8,15 @@ All AWS services run locally via **LocalStack** (Docker). Zero cloud costs. The 
 
 ## Current Status
 
-All phases complete. The system is fully operational.
+All modules complete. The system is fully operational.
 
-- **Phase 0: Foundation** -- COMPLETE
-- **Phase 1: Storage (S3 + DynamoDB)** -- COMPLETE
-- **Phase 2: Messaging (SQS + SNS)** -- COMPLETE
-- **Phase 3: Compute (Lambda)** -- COMPLETE
-- **Phase 4: API Layer (API Gateway)** -- COMPLETE
-- **Phase 5: Orchestration (Step Functions)** -- COMPLETE
-- **Phase 6: Events & Monitoring (EventBridge + CloudWatch)** -- COMPLETE
+- **Foundation** -- COMPLETE
+- **Storage (S3 + DynamoDB)** -- COMPLETE
+- **Messaging (SQS + SNS)** -- COMPLETE
+- **Compute (Lambda)** -- COMPLETE
+- **API (API Gateway)** -- COMPLETE
+- **Orchestration (Step Functions)** -- COMPLETE
+- **Monitoring (EventBridge + CloudWatch)** -- COMPLETE
 - **React Frontend** -- COMPLETE (Vite + React 19 + React Router 7)
 
 ## Key Conventions
@@ -30,7 +30,7 @@ All phases complete. The system is fully operational.
 | AWS credentials | Dummy values (`test` / `test`) -- LocalStack ignores them but SDK requires them |
 | Package manager | npm |
 | Docker | `docker compose` (v2 syntax, no hyphen) |
-| OpenTofu state | Per-phase directories under `tofu/` (each phase has its own state) |
+| OpenTofu state | Per-module directories under `tofu/` (each module has its own state) |
 | Data source | swgaide.com XML exports, SWG Legends server ID 138 |
 | LocalStack auth | Requires `LOCALSTACK_AUTH_TOKEN` in `.env` (free Hobby tier) |
 | Corporate proxy | Ion Group HTTPS interception; combined CA bundle mounted in Docker |
@@ -46,13 +46,13 @@ After `npm run localstack:reset` or a fresh clone:
 # 1. Start LocalStack
 npm run localstack:up
 
-# 2. Provision all infrastructure (order matters -- phases reference each other's resources)
-tofu -chdir=tofu/phase1 init && tofu -chdir=tofu/phase1 apply -auto-approve
-tofu -chdir=tofu/phase2 init && tofu -chdir=tofu/phase2 apply -auto-approve
-tofu -chdir=tofu/phase3 init && tofu -chdir=tofu/phase3 apply -auto-approve
-tofu -chdir=tofu/phase4 init && tofu -chdir=tofu/phase4 apply -auto-approve
-tofu -chdir=tofu/phase5 init && tofu -chdir=tofu/phase5 apply -auto-approve
-tofu -chdir=tofu/phase6 init && tofu -chdir=tofu/phase6 apply -auto-approve
+# 2. Provision all infrastructure (order matters -- modules reference each other's resources)
+tofu -chdir=tofu/storage init && tofu -chdir=tofu/storage apply -auto-approve
+tofu -chdir=tofu/messaging init && tofu -chdir=tofu/messaging apply -auto-approve
+tofu -chdir=tofu/compute init && tofu -chdir=tofu/compute apply -auto-approve
+tofu -chdir=tofu/api init && tofu -chdir=tofu/api apply -auto-approve
+tofu -chdir=tofu/orchestration init && tofu -chdir=tofu/orchestration apply -auto-approve
+tofu -chdir=tofu/monitoring init && tofu -chdir=tofu/monitoring apply -auto-approve
 tofu -chdir=tofu/frontend init && tofu -chdir=tofu/frontend apply -auto-approve
 
 # 3. Build and deploy all 12 Lambda functions
@@ -87,17 +87,17 @@ swg-legends-localstack-infra/
   .env.example                # Template for .env
   certs/                      # Corporate proxy CA bundle (gitignored)
   plan/
-    handoff.md                # Full project backstory, decisions, phase outcomes
+    handoff.md                # Full project backstory, decisions, module outcomes
     agents.md                 # This file -- AI agent context
   tofu/
-    main.tf                   # Root provider config (Phase 0)
+    main.tf                   # Root provider config (Foundation)
     variables.tf              # Shared variables
-    phase1/                   # S3 bucket + DynamoDB tables (resources, resource-history)
-    phase2/                   # SNS topics + SQS queues + DynamoDB tables (event-log, alert-rules)
-    phase3/                   # Lambda functions (alert-evaluator, history-recorder) + IAM + SQS event sources
-    phase4/                   # API Gateway REST API (7 endpoints) + 3 API Lambdas + IAM
-    phase5/                   # Step Functions state machine + 7 pipeline Lambdas + IAM
-    phase6/                   # EventBridge rules + CloudWatch dashboard/alarm + SNS topic
+    storage/                  # S3 bucket + DynamoDB tables (resources, resource-history)
+    messaging/                # SNS topics + SQS queues + DynamoDB tables (event-log, alert-rules)
+    compute/                  # Lambda functions (alert-evaluator, history-recorder) + IAM + SQS event sources
+    api/                      # API Gateway REST API (7 endpoints) + 3 API Lambdas + IAM
+    orchestration/            # Step Functions state machine + 7 pipeline Lambdas + IAM
+    monitoring/               # EventBridge rules + CloudWatch dashboard/alarm + SNS topic
     frontend/                 # S3 bucket + website hosting config
   frontend/                   # React frontend (separate npm project)
     package.json              # Vite + React + TypeScript
@@ -124,7 +124,7 @@ swg-legends-localstack-infra/
   src/
     config.ts                 # Shared AWS client factories + constants
     types.ts                  # SWGResource, ResourceItem, DiffResult, EventLogItem types
-    verify-localstack.ts      # Phase 0 smoke test
+    verify-localstack.ts      # Foundation smoke test
     ingest/
       download.ts             # Download + decompress SWGAide XML export
       parse-resources.ts      # Parse XML -> SWGResource[]
@@ -149,18 +149,18 @@ swg-legends-localstack-infra/
       generate-dashboard.ts   # Generate Bazaar Terminal HTML dashboard
       generate-ops-dashboard.ts # Generate operations HTML dashboard
     lambda/
-      alert-evaluator/        # Phase 3: evaluate spawns against alert rules (SQS-triggered)
-      history-recorder/       # Phase 3: record despawns to history table (SQS-triggered)
-      api-get-resources/      # Phase 4: GET /resources, GET /resources/{id}
-      api-get-events/         # Phase 4: GET /events
-      api-alerts/             # Phase 4: /alerts/rules CRUD + /alerts/history
-      pipeline-download/      # Phase 5: download SWGAide XML, upload to S3
-      pipeline-parse/         # Phase 5: parse XML, write JSON to S3
-      pipeline-diff/          # Phase 5: diff parsed data against DynamoDB
-      pipeline-update-db/     # Phase 5: add spawned / remove despawned
-      pipeline-log-events/    # Phase 5: write events to event-log table
-      pipeline-publish-sns/   # Phase 5: publish spawn/despawn to SNS
-      pipeline-archive/       # Phase 5: archive XML to permanent S3 path
+      alert-evaluator/        # Compute: evaluate spawns against alert rules (SQS-triggered)
+      history-recorder/       # Compute: record despawns to history table (SQS-triggered)
+      api-get-resources/      # API: GET /resources, GET /resources/{id}
+      api-get-events/         # API: GET /events
+      api-alerts/             # API: /alerts/rules CRUD + /alerts/history
+      pipeline-download/      # Orchestration: download SWGAide XML, upload to S3
+      pipeline-parse/         # Orchestration: parse XML, write JSON to S3
+      pipeline-diff/          # Orchestration: diff parsed data against DynamoDB
+      pipeline-update-db/     # Orchestration: add spawned / remove despawned
+      pipeline-log-events/    # Orchestration: write events to event-log table
+      pipeline-publish-sns/   # Orchestration: publish spawn/despawn to SNS
+      pipeline-archive/       # Orchestration: archive XML to permanent S3 path
     api/
       test-api.ts             # Smoke test for all 15 API endpoint tests
     pipeline/
@@ -235,7 +235,7 @@ swg-legends-localstack-infra/
 
 ## Known LocalStack Limitations
 
-- **API Gateway v2 (HTTP API)** requires a paid LocalStack license. Phase 4 uses REST API v1 (`aws_api_gateway_*`), which is available on the free Hobby tier.
+- **API Gateway v2 (HTTP API)** requires a paid LocalStack license. The API module uses REST API v1 (`aws_api_gateway_*`), which is available on the free Hobby tier.
 - **MOCK integration responses** (for OPTIONS/CORS preflight) fail on LocalStack. CORS is handled by Lambda response headers instead (`Access-Control-Allow-Origin: *` on every response).
 - **Lambda containers behind corporate proxy** can't reach external HTTPS URLs due to self-signed cert interception. The `pipeline-download` Lambda uses `NODE_TLS_REJECT_UNAUTHORIZED=0` as a LocalStack-only workaround.
 - **Step Functions Parallel state** output replaces the state data with an array. Use `ResultPath` to merge parallel output into existing state data, preserving fields needed by later steps.
@@ -244,4 +244,4 @@ swg-legends-localstack-infra/
 
 ## Full Details
 
-See `plan/handoff.md` for the complete backstory, all decisions made, data source details, phase-by-phase outcomes, and possible extensions.
+See `plan/handoff.md` for the complete backstory, all decisions made, data source details, module-by-module outcomes, and possible extensions.

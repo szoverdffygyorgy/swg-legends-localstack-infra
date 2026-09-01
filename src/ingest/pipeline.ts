@@ -1,7 +1,7 @@
 /**
  * Full ingestion pipeline: orchestrates the complete data flow.
  *
- * Phase 2 flow (diff-based):
+ * Diff-based ingestion flow:
  * 1. Download + decompress SWGAide XML export
  * 2. Parse XML into typed SWGResource objects
  * 3. Diff against current DynamoDB state
