@@ -174,6 +174,7 @@ async function queryByPlanet(
   minValue?: number
 ): Promise<ResourceItem[]> {
   const expressionValues: Record<string, unknown> = { ":planet": planet };
+  const expressionNames: Record<string, string> = {};
   const input: QueryCommandInput = {
     TableName: tableName,
     IndexName: "by-planet",
@@ -183,8 +184,83 @@ async function queryByPlanet(
 
   if (filterStat && minValue !== undefined) {
     input.FilterExpression = "#stat >= :minVal";
-    input.ExpressionAttributeNames = { "#stat": filterStat };
+    expressionNames["#stat"] = filterStat;
     expressionValues[":minVal"] = minValue;
+  }
+
+  if (Object.keys(expressionNames).length > 0) {
+    input.ExpressionAttributeNames = expressionNames;
+  }
+
+  const result = await docClient.send(new QueryCommand(input));
+  return (result.Items ?? []) as ResourceItem[];
+}
+
+/**
+ * Query resources by planet AND class hierarchy.
+ * Queries the by-planet GSI, then adds a FilterExpression for the class
+ * hierarchy using begins_with on classPath.
+ *
+ * This handles the combined case where both ?planet= and ?class= are
+ * provided (e.g., "all Metals on Tatooine").
+ */
+async function queryByPlanetAndClass(
+  planet: string,
+  resourceClass: string,
+  filterStat?: string,
+  minValue?: number,
+  cache?: Map<string, ClassInfo>
+): Promise<ResourceItem[]> {
+  const expressionValues: Record<string, unknown> = { ":planet": planet };
+  const expressionNames: Record<string, string> = {};
+  const filterParts: string[] = [];
+
+  // Build class hierarchy filter
+  if (cache) {
+    const classInfo = cache.get(resourceClass);
+    if (classInfo) {
+      if (classInfo.depth === 0) {
+        // Root category: filter by classCategory
+        filterParts.push("classCategory = :classCategory");
+        expressionValues[":classCategory"] = classInfo.className;
+      } else if (!isLeafNode(resourceClass, cache)) {
+        // Branch node: filter by classPath prefix
+        filterParts.push("begins_with(classPath, :classPrefix)");
+        expressionValues[":classPrefix"] = classInfo.treePath + "/";
+      } else {
+        // Leaf node: exact match on classPath
+        filterParts.push("classPath = :classPath");
+        expressionValues[":classPath"] = classInfo.treePath;
+      }
+    } else {
+      // Fallback: exact match on resourceClass string
+      filterParts.push("resourceClass = :cls");
+      expressionValues[":cls"] = resourceClass;
+    }
+  } else {
+    filterParts.push("resourceClass = :cls");
+    expressionValues[":cls"] = resourceClass;
+  }
+
+  // Add stat filter
+  if (filterStat && minValue !== undefined) {
+    filterParts.push("#stat >= :minVal");
+    expressionNames["#stat"] = filterStat;
+    expressionValues[":minVal"] = minValue;
+  }
+
+  const input: QueryCommandInput = {
+    TableName: tableName,
+    IndexName: "by-planet",
+    KeyConditionExpression: "planet = :planet",
+    ExpressionAttributeValues: expressionValues,
+  };
+
+  if (filterParts.length > 0) {
+    input.FilterExpression = filterParts.join(" AND ");
+  }
+  if (Object.keys(expressionNames).length > 0) {
+    input.ExpressionAttributeNames = expressionNames;
   }
 
   const result = await docClient.send(new QueryCommand(input));
@@ -381,7 +457,9 @@ export async function handler(
 
     let items: ResourceItem[];
 
-    if (planet) {
+    if (planet && resourceClass) {
+      items = await queryByPlanetAndClass(planet, resourceClass, stat, minValue, cache);
+    } else if (planet) {
       items = await queryByPlanet(planet, stat, minValue);
     } else if (resourceClass) {
       items = await queryByClass(resourceClass, stat, minValue, cache);
