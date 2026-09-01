@@ -16,13 +16,14 @@
 
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, BatchWriteCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
+import { DynamoDBDocumentClient, BatchWriteCommand, ScanCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
 
 // ─── Config ──────────────────────────────────────────────────────────
 
 const BUCKET = process.env.RAW_EXPORTS_BUCKET || "swg-legends-raw-exports";
 const RESOURCES_TABLE = process.env.RESOURCES_TABLE || "resources";
 const RESOURCE_CLASSES_TABLE = process.env.RESOURCE_CLASSES_TABLE || "resource-classes";
+const EVENT_LOG_TABLE = process.env.EVENT_LOG_TABLE || "event-log";
 const endpoint = process.env.LOCALSTACK_ENDPOINT || "http://localhost:4566";
 const region = process.env.AWS_REGION_CUSTOM || process.env.AWS_REGION || "us-east-1";
 const BATCH_SIZE = 25;
@@ -56,6 +57,7 @@ interface UpdateInput {
 interface UpdateOutput extends UpdateInput {
   itemsAdded: number;
   itemsRemoved: number;
+  unclassifiedCount: number;
 }
 
 interface SWGResource {
@@ -229,17 +231,24 @@ export async function handler(event: UpdateInput): Promise<UpdateOutput> {
 
   let itemsAdded = 0;
   let itemsRemoved = 0;
+  const unclassifiedClasses = new Set<string>();
 
   // Add spawned resources (enriched with classification)
   if (diff.spawned.length > 0) {
     const items = diff.spawned.flatMap((r: SWGResource) => denormalize(r, cache));
     console.log(`Adding ${diff.spawned.length} resources (${items.length} items)`);
 
-    // Count how many were classified
-    const classified = items.filter((i: Record<string, unknown>) => i.classPath).length;
-    const unclassified = items.length - classified;
-    if (unclassified > 0) {
-      console.warn(`Warning: ${unclassified} items could not be classified (unknown resource class)`);
+    // Track which resource classes couldn't be classified
+    for (const r of diff.spawned as SWGResource[]) {
+      if (!cache.has(r.resourceClass)) {
+        unclassifiedClasses.add(r.resourceClass);
+      }
+    }
+
+    if (unclassifiedClasses.size > 0) {
+      console.warn(
+        `Warning: ${unclassifiedClasses.size} unknown resource class(es): ${[...unclassifiedClasses].join(", ")}`
+      );
     }
 
     for (let i = 0; i < items.length; i += BATCH_SIZE) {
@@ -282,5 +291,34 @@ export async function handler(event: UpdateInput): Promise<UpdateOutput> {
 
   console.log(`DynamoDB updated: ${itemsAdded} added, ${itemsRemoved} removed`);
 
-  return { ...event, itemsAdded, itemsRemoved };
+  // Write DATA_ISSUE events for unclassified resource classes
+  if (unclassifiedClasses.size > 0) {
+    const now = new Date();
+    const dateStr = now.toISOString().slice(0, 10);
+    const timestamp = now.toISOString();
+
+    console.log(`Writing ${unclassifiedClasses.size} DATA_ISSUE event(s) for unclassified classes`);
+
+    for (const className of unclassifiedClasses) {
+      await docClient.send(
+        new PutCommand({
+          TableName: EVENT_LOG_TABLE,
+          Item: {
+            date: dateStr,
+            sk: `${timestamp}#UNCLASSIFIED#${className}`,
+            eventType: "DATA_ISSUE",
+            resourceId: "N/A",
+            resourceName: "N/A",
+            resourceClass: className,
+            planets: "",
+            statSummary: "",
+            detectedAt: timestamp,
+            issue: `Resource class "${className}" not found in classification hierarchy. The game may have been patched with new resource types. Re-scrape with: npm run scrape:tree && npm run seed:classes`,
+          },
+        })
+      );
+    }
+  }
+
+  return { ...event, itemsAdded, itemsRemoved, unclassifiedCount: unclassifiedClasses.size };
 }

@@ -185,6 +185,25 @@ export async function loadResources(
     `  Denormalized ${resources.length} resources into ${allItems.length} items`
   );
 
+  // Check for unclassified resources
+  const unclassifiedClasses = new Set<string>();
+  for (const r of resources) {
+    if (!classCache.has(r.resourceClass)) {
+      unclassifiedClasses.add(r.resourceClass);
+    }
+  }
+  if (unclassifiedClasses.size > 0) {
+    console.warn(
+      `\n  \x1b[33mWarning: ${unclassifiedClasses.size} unknown resource class(es):\x1b[0m`
+    );
+    for (const cls of unclassifiedClasses) {
+      console.warn(`    - "${cls}"`);
+    }
+    console.warn(
+      `  \x1b[2mRe-scrape with: npm run scrape:tree && npm run seed:classes\x1b[0m\n`
+    );
+  }
+
   // Write in batches of 25
   let written = 0;
   for (let i = 0; i < allItems.length; i += BATCH_SIZE) {
@@ -249,6 +268,25 @@ export async function addResources(
   // Load classification cache for enrichment
   const classCache = await loadClassCache();
   const allItems: ResourceItem[] = resources.flatMap((r) => denormalize(r, classCache));
+
+  // Check for unclassified resources
+  const unclassifiedClasses = new Set<string>();
+  for (const r of resources) {
+    if (!classCache.has(r.resourceClass)) {
+      unclassifiedClasses.add(r.resourceClass);
+    }
+  }
+  if (unclassifiedClasses.size > 0) {
+    console.warn(
+      `  \x1b[33mWarning: ${unclassifiedClasses.size} unknown resource class(es):\x1b[0m`
+    );
+    for (const cls of unclassifiedClasses) {
+      console.warn(`    - "${cls}"`);
+    }
+    console.warn(
+      `  \x1b[2mRe-scrape with: npm run scrape:tree && npm run seed:classes\x1b[0m`
+    );
+  }
 
   console.log(
     `  Adding ${resources.length} new resources (${allItems.length} items)`
