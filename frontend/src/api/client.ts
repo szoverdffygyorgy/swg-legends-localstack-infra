@@ -87,8 +87,8 @@ export async function getAlertRules(): Promise<AlertRulesResponse> {
 export async function createAlertRule(body: {
   name: string;
   classPattern: string;
-  stat?: string;
-  minValue?: number;
+  statThresholds?: Record<string, number>;
+  planets?: string[];
 }): Promise<CreateRuleResponse> {
   return fetchJson<CreateRuleResponse>(`${BASE}/alerts/rules`, {
     method: "POST",

@@ -36,23 +36,32 @@
 /* ─── Create form ─────────────────────────────────────── */
 
 .create-form {
-  margin-bottom: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .form-row {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
-  align-items: flex-end;
+  align-items: flex-start;
 }
 
 .form-group {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  position: relative;
 }
 
-.form-group label {
+.form-group--wide {
+  flex: 1;
+  min-width: 200px;
+}
+
+.form-group label,
+.form-section-label {
   color: var(--text-secondary);
   font-size: 0.7rem;
   font-weight: 600;
@@ -61,7 +70,10 @@
 }
 
 .form-group input,
-.form-group select {
+.form-group select,
+.threshold-row select,
+.threshold-row input,
+.planet-row select {
   background: var(--bg-input);
   color: var(--text-primary);
   border: 1px solid var(--border);
@@ -74,25 +86,22 @@
 }
 
 .form-group input:focus,
-.form-group select:focus {
+.form-group select:focus,
+.threshold-row select:focus,
+.threshold-row input:focus,
+.planet-row select:focus {
   border-color: var(--border-focus);
 }
 
-.form-group input:disabled {
+.form-group input:disabled,
+.threshold-row input:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
 
-.form-group input[type="text"] {
-  min-width: 160px;
-}
-
-.form-group input[type="number"] {
-  width: 80px;
-}
-
-.form-group select {
-  min-width: 100px;
+.form-group select,
+.threshold-row select,
+.planet-row select {
   cursor: pointer;
   padding-right: 28px;
   appearance: none;
@@ -100,6 +109,164 @@
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%236888a0' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 10px center;
+}
+
+/* ─── Typeahead dropdown ──────────────────────────────── */
+
+.typeahead-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  max-height: 240px;
+  overflow-y: auto;
+  z-index: 100;
+  margin-top: 2px;
+  box-shadow: var(--shadow);
+}
+
+.typeahead-item {
+  display: flex;
+  flex-direction: column;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition: background var(--transition);
+  border-bottom: 1px solid var(--border);
+}
+
+.typeahead-item:last-child {
+  border-bottom: none;
+}
+
+.typeahead-item:hover {
+  background: var(--bg-hover);
+}
+
+.typeahead-name {
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.typeahead-item--branch .typeahead-name {
+  color: var(--accent-gold);
+}
+
+.typeahead-item--leaf .typeahead-name {
+  color: var(--accent-cyan);
+}
+
+.typeahead-breadcrumb {
+  color: var(--text-dim);
+  font-size: 0.7rem;
+  margin-top: 1px;
+}
+
+/* ─── Form sections (thresholds, planets) ─────────────── */
+
+.form-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-section-label {
+  margin-bottom: 2px;
+}
+
+/* ─── Threshold rows ──────────────────────────────────── */
+
+.threshold-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.threshold-row select {
+  min-width: 90px;
+}
+
+.threshold-row input[type="number"] {
+  width: 80px;
+}
+
+.threshold-operator {
+  color: var(--text-dim);
+  font-family: "Share Tech Mono", monospace;
+  font-size: 0.85rem;
+}
+
+/* ─── Planet rows ─────────────────────────────────────── */
+
+.planet-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.planet-row select {
+  min-width: 150px;
+}
+
+/* ─── Add / Remove buttons ────────────────────────────── */
+
+.btn-add {
+  background: transparent;
+  color: var(--accent-blue);
+  border: 1px dashed var(--border-light);
+  padding: 5px 12px;
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 1px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all var(--transition);
+  align-self: flex-start;
+}
+
+.btn-add:hover {
+  border-color: var(--accent-blue);
+  background: rgba(85, 153, 204, 0.08);
+}
+
+.btn-add:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.btn-remove {
+  background: transparent;
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all var(--transition);
+  flex-shrink: 0;
+  font-family: "Share Tech Mono", monospace;
+}
+
+.btn-remove:hover {
+  color: var(--status-error);
+  border-color: var(--status-error);
+}
+
+/* ─── Form actions ────────────────────────────────────── */
+
+.form-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-top: 4px;
 }
 
 .btn-create {
@@ -130,7 +297,15 @@
 .form-error {
   color: var(--status-error);
   font-size: 0.8rem;
-  margin-top: 8px;
+}
+
+/* ─── Empty state ─────────────────────────────────────── */
+
+.empty-state {
+  text-align: center;
+  padding: 24px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
 }
 
 /* ─── Delete button ───────────────────────────────────── */
@@ -171,6 +346,17 @@
   color: var(--text-secondary);
   font-family: "Share Tech Mono", monospace;
   font-size: 0.8rem;
+}
+
+.cell-thresholds {
+  color: var(--accent-cyan);
+  font-family: "Share Tech Mono", monospace;
+  font-size: 0.8rem;
+}
+
+.cell-class-pattern {
+  color: var(--accent-gold);
+  font-weight: 600;
 }
 
 .cell-date {
