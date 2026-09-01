@@ -1,0 +1,188 @@
+/* ─── Alerts page layout ──────────────────────────────── */
+
+.alerts-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.alerts-section {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+}
+
+.section-title {
+  color: var(--accent-gold);
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.section-count {
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  padding: 2px 8px;
+  border-radius: var(--radius);
+}
+
+/* ─── Create form ─────────────────────────────────────── */
+
+.create-form {
+  margin-bottom: 4px;
+}
+
+.form-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.form-group label {
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.form-group input,
+.form-group select {
+  background: var(--bg-input);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  padding: 7px 10px;
+  font-family: "Share Tech Mono", monospace;
+  font-size: 0.85rem;
+  border-radius: var(--radius);
+  outline: none;
+  transition: border-color var(--transition);
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  border-color: var(--border-focus);
+}
+
+.form-group input:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.form-group input[type="text"] {
+  min-width: 160px;
+}
+
+.form-group input[type="number"] {
+  width: 80px;
+}
+
+.form-group select {
+  min-width: 100px;
+  cursor: pointer;
+  padding-right: 28px;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%236888a0' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+}
+
+.btn-create {
+  background: var(--accent-blue);
+  color: var(--bg-deep);
+  border: none;
+  padding: 8px 20px;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all var(--transition);
+  white-space: nowrap;
+}
+
+.btn-create:hover {
+  background: var(--accent-cyan);
+}
+
+.btn-create:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.form-error {
+  color: var(--status-error);
+  font-size: 0.8rem;
+  margin-top: 8px;
+}
+
+/* ─── Delete button ───────────────────────────────────── */
+
+.btn-delete {
+  background: transparent;
+  color: var(--status-error);
+  border: 1px solid var(--status-error);
+  padding: 3px 10px;
+  font-family: inherit;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.btn-delete:hover {
+  background: var(--status-error);
+  color: var(--bg-deep);
+}
+
+/* ─── Table overrides for alerts ──────────────────────── */
+
+.alerts-section .table-wrapper {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+.alerts-section .data-table thead th {
+  background: var(--bg-surface);
+}
+
+.cell-stat-label {
+  color: var(--text-secondary);
+  font-family: "Share Tech Mono", monospace;
+  font-size: 0.8rem;
+}
+
+.cell-date {
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  font-family: "Share Tech Mono", monospace;
+}
+
+.cell-class {
+  color: var(--text-secondary);
+}
+
+.cell-planets {
+  color: var(--text-dim);
+}

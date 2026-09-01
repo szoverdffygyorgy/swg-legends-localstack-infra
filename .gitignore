@@ -4,6 +4,9 @@ node_modules/
 # TypeScript build output
 dist/
 
+# Frontend build output
+frontend/dist/
+
 # OpenTofu / Terraform
 .terraform/
 *.tfstate

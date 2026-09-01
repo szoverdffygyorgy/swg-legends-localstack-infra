@@ -84,6 +84,31 @@ swg-legends-localstack-infra/
       sns.tf                  # pipeline-alerts SNS topic
       cloudwatch.tf           # Dashboard definition + pipeline failure alarm
       outputs.tf              # Schedule details, dashboard name, alarm name
+    frontend/
+      main.tf                 # S3 bucket + website hosting + public access policy
+  frontend/                     # React frontend (separate npm project)
+    package.json                # Vite + React + TypeScript
+    tsconfig.json               # TypeScript config
+    vite.config.ts              # Dev server + API proxy to LocalStack
+    index.html                  # Vite entry point
+    src/
+      main.tsx                  # React root mount
+      App.tsx                   # Routes: /resources, /events, /alerts
+      vite-env.d.ts             # CSS module declarations
+      api/
+        client.ts               # Typed fetch wrapper for all API endpoints
+        types.ts                # Response types matching Lambda output
+      pages/
+        Resources.tsx           # Resource table with filters + sorting
+        Events.tsx              # Event feed with date picker + type filter
+        Alerts.tsx              # Alert rules CRUD + fired alert history
+      components/
+        Layout.tsx              # Header, nav tabs, content area, footer
+        StatusBadge.tsx         # Colored status pill (SPAWNED/DESPAWNED/etc.)
+        LoadingSpinner.tsx      # Loading state
+        ErrorMessage.tsx        # Error display with retry button
+      styles/
+        theme.css               # SWG NGE color palette (CSS custom properties)
   src/
     config.ts                 # Shared AWS client factories + constants
     types.ts                  # SWGResource, ResourceItem, DiffResult, EventLogItem types
@@ -143,6 +168,7 @@ swg-legends-localstack-infra/
       status.ts               # Check pipeline execution status
   scripts/
     build-lambdas.ts          # esbuild bundle + zip + deploy Lambdas to LocalStack
+    deploy-frontend.ts        # Build React app + upload to S3 static hosting
   data/                       # Downloaded XML + generated dashboard (gitignored)
   dist/lambda/                # Built Lambda zip files (gitignored)
 ```
@@ -181,6 +207,9 @@ swg-legends-localstack-infra/
 | `npm run tofu:init:phase6` | Initialize Phase 6 OpenTofu |
 | `npm run tofu:apply:phase6` | Apply Phase 6 infrastructure |
 | `npm run dashboard:ops` | Generate operations HTML dashboard |
+| `npm run frontend:dev` | Start React dev server (http://localhost:3000) with API proxy |
+| `npm run frontend:build` | Build React app for production |
+| `npm run frontend:deploy` | Build + upload React app to S3 static hosting |
 
 ## Known Future Additions
 

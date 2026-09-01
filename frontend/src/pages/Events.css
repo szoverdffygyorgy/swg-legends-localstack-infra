@@ -1,0 +1,108 @@
+/* ─── Type filter buttons ─────────────────────────────── */
+
+.type-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.type-btn {
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  padding: 6px 12px;
+  font-family: "Share Tech Mono", monospace;
+  font-size: 0.75rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.type-btn:hover {
+  border-color: var(--border-light);
+  color: var(--text-primary);
+}
+
+.type-btn--active {
+  background: var(--accent-blue);
+  color: var(--bg-deep);
+  border-color: var(--accent-blue);
+}
+
+.type-btn--active:hover {
+  color: var(--bg-deep);
+}
+
+/* ─── Empty state ─────────────────────────────────────── */
+
+.empty-state {
+  text-align: center;
+  padding: 40px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+/* ─── Events list ─────────────────────────────────────── */
+
+.events-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.event-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  transition: border-color var(--transition);
+}
+
+.event-card:hover {
+  border-color: var(--border-light);
+}
+
+.event-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.event-time {
+  color: var(--text-dim);
+  font-family: "Share Tech Mono", monospace;
+  font-size: 0.8rem;
+  min-width: 65px;
+}
+
+.event-name {
+  color: var(--accent-cyan);
+  font-weight: 600;
+}
+
+.event-class {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.event-details {
+  display: flex;
+  gap: 16px;
+  padding-left: 75px;
+  font-size: 0.8rem;
+}
+
+.event-planets {
+  color: var(--text-dim);
+}
+
+.event-stats {
+  color: var(--text-secondary);
+  font-family: "Share Tech Mono", monospace;
+}
+
+.event-issue {
+  color: var(--status-warn);
+}

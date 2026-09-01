@@ -1,0 +1,111 @@
+/* SWG Legends NGE UI Theme
+ *
+ * Color palette inspired by the Star Wars Galaxies NGE in-game interface:
+ * dark blue-black backgrounds, pale blue-white text, warm gold accents.
+ */
+
+:root {
+  /* Backgrounds */
+  --bg-deep: #0c1525;
+  --bg-panel: #0f1a2e;
+  --bg-surface: #162035;
+  --bg-hover: #1a2a4a;
+  --bg-input: #0a1220;
+
+  /* Text */
+  --text-primary: #c0d0e0;
+  --text-secondary: #6888a0;
+  --text-dim: #3a5068;
+  --text-bright: #e0ecf4;
+
+  /* Accents */
+  --accent-gold: #d4a846;
+  --accent-gold-dim: #a07830;
+  --accent-blue: #5599cc;
+  --accent-cyan: #7ec8e3;
+
+  /* Status */
+  --status-ok: #3d9e4f;
+  --status-ok-bg: rgba(61, 158, 79, 0.1);
+  --status-warn: #c9922a;
+  --status-warn-bg: rgba(201, 146, 42, 0.1);
+  --status-error: #c94040;
+  --status-error-bg: rgba(201, 64, 64, 0.1);
+  --status-info: #5599cc;
+  --status-info-bg: rgba(85, 153, 204, 0.1);
+
+  /* Borders */
+  --border: #1e3050;
+  --border-light: #2a4060;
+  --border-focus: #5599cc;
+
+  /* Misc */
+  --radius: 4px;
+  --radius-lg: 8px;
+  --shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --transition: 150ms ease;
+}
+
+/* ─── Reset & Base ───────────────────────────────────────── */
+
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 14px;
+}
+
+body {
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  font-family: "Rajdhani", "Segoe UI", system-ui, sans-serif;
+  font-weight: 500;
+  line-height: 1.5;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── Scrollbar ──────────────────────────────────────────── */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-deep);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-light);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-blue);
+}
+
+/* ─── Selection ──────────────────────────────────────────── */
+
+::selection {
+  background: rgba(85, 153, 204, 0.3);
+  color: var(--text-bright);
+}
+
+/* ─── Links ──────────────────────────────────────────────── */
+
+a {
+  color: var(--accent-blue);
+  text-decoration: none;
+  transition: color var(--transition);
+}
+
+a:hover {
+  color: var(--accent-cyan);
+}
