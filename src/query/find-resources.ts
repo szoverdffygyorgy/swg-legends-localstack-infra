@@ -140,22 +140,22 @@ async function queryByClass(
     }
   }
 
-  // Fallback: exact match on by-class GSI
+  // Fallback: scan with filter for unrecognized class names
+  console.warn(`  Class "${resourceClass}" not found in hierarchy, falling back to scan`);
   const expressionValues: Record<string, unknown> = { ":cls": resourceClass };
-  const input: QueryCommandInput = {
+  const fallbackInput: ScanCommandInput = {
     TableName: RESOURCES_TABLE,
-    IndexName: "by-class",
-    KeyConditionExpression: "resourceClass = :cls",
+    FilterExpression: "resourceClass = :cls",
     ExpressionAttributeValues: expressionValues,
   };
 
   if (filterStat && minValue !== undefined) {
-    input.FilterExpression = "#stat >= :minVal";
-    input.ExpressionAttributeNames = { "#stat": filterStat };
+    fallbackInput.FilterExpression += " AND #stat >= :minVal";
+    fallbackInput.ExpressionAttributeNames = { "#stat": filterStat };
     expressionValues[":minVal"] = minValue;
   }
 
-  const result = await docClient.send(new QueryCommand(input));
+  const result = await docClient.send(new ScanCommand(fallbackInput));
   return (result.Items ?? []) as ResourceItem[];
 }
 

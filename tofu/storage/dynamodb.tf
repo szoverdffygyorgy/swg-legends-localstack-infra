@@ -8,9 +8,8 @@
 # Our access patterns for the resources table:
 #   1. Get a specific resource by ID         -> partition key lookup
 #   2. All resources on a planet             -> GSI by-planet
-#   3. All resources of a class (e.g. Copper) -> GSI by-class
-#   4. All resources under a class hierarchy -> GSI by-category
-#   5. Filter by stat thresholds             -> filter on any of the above
+#   3. All resources under a class hierarchy -> GSI by-category
+#   4. Filter by stat thresholds             -> filter on any of the above
 #
 # What's a GSI (Global Secondary Index)?
 # Think of it as a "second table" that DynamoDB maintains automatically.
@@ -34,9 +33,6 @@
 #
 # GSI by-planet: planet (partition) + resourceClass (sort)
 # - "Show me all Reactive Gas resources on Mustafar"
-#
-# GSI by-class: resourceClass (partition) + resourceName (sort)
-# - "Show me all Copper resources across all planets"
 #
 # GSI by-category: classCategory (partition) + classPath (sort)
 # - "Show me all Metal resources" via begins_with on classPath
@@ -67,12 +63,6 @@ resource "aws_dynamodb_table" "resources" {
     type = "S"
   }
 
-  # Used as sort key in the by-class GSI
-  attribute {
-    name = "resourceName"
-    type = "S"
-  }
-
   # Used as partition key in the by-category GSI
   # Top-level category: "Inorganic", "Organic", "Energy", "Space Resource"
   attribute {
@@ -95,16 +85,6 @@ resource "aws_dynamodb_table" "resources" {
     hash_key        = "planet"
     range_key       = "resourceClass"
     projection_type = "ALL" # Copy all attributes into the index
-  }
-
-  # GSI: query by resource class
-  # "All Copper resources" -> query with resourceClass = "Copper"
-  # Sort by resourceName for consistent ordering
-  global_secondary_index {
-    name            = "by-class"
-    hash_key        = "resourceClass"
-    range_key       = "resourceName"
-    projection_type = "ALL"
   }
 
   # GSI: query by class hierarchy

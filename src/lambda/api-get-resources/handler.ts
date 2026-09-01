@@ -272,7 +272,7 @@ async function queryByPlanetAndClass(
  * Looks up the class in the hierarchy to find its treePath and category,
  * then queries with begins_with to match all descendants.
  *
- * Falls back to exact match on by-class GSI if the class isn't found
+ * Falls back to a scan with filter if the class isn't found
  * in the hierarchy (backward compatibility).
  */
 async function queryByClass(
@@ -328,22 +328,24 @@ async function queryByClass(
     }
   }
 
-  // Fallback: exact match on by-class GSI (legacy behavior)
+  // Fallback: scan with filter for unrecognized class names
+  // This path only triggers if the class isn't in the hierarchy (e.g., after
+  // a game patch before re-scraping). Uses scan + filter instead of a GSI.
+  console.warn(`Class "${resourceClass}" not found in hierarchy, falling back to scan`);
   const expressionValues: Record<string, unknown> = { ":cls": resourceClass };
-  const input: QueryCommandInput = {
+  const fallbackInput: ScanCommandInput = {
     TableName: tableName,
-    IndexName: "by-class",
-    KeyConditionExpression: "resourceClass = :cls",
+    FilterExpression: "resourceClass = :cls",
     ExpressionAttributeValues: expressionValues,
   };
 
   if (filterStat && minValue !== undefined) {
-    input.FilterExpression = "#stat >= :minVal";
-    input.ExpressionAttributeNames = { "#stat": filterStat };
+    fallbackInput.FilterExpression += " AND #stat >= :minVal";
+    fallbackInput.ExpressionAttributeNames = { "#stat": filterStat };
     expressionValues[":minVal"] = minValue;
   }
 
-  const result = await docClient.send(new QueryCommand(input));
+  const result = await docClient.send(new ScanCommand(fallbackInput));
   return (result.Items ?? []) as ResourceItem[];
 }
 
