@@ -9,7 +9,8 @@
 #   1. Get a specific resource by ID         -> partition key lookup
 #   2. All resources on a planet             -> GSI by-planet
 #   3. All resources of a class (e.g. Copper) -> GSI by-class
-#   4. Filter by stat thresholds             -> filter on any of the above
+#   4. All resources under a class hierarchy -> GSI by-category
+#   5. Filter by stat thresholds             -> filter on any of the above
 #
 # What's a GSI (Global Secondary Index)?
 # Think of it as a "second table" that DynamoDB maintains automatically.
@@ -36,6 +37,11 @@
 #
 # GSI by-class: resourceClass (partition) + resourceName (sort)
 # - "Show me all Copper resources across all planets"
+#
+# GSI by-category: classCategory (partition) + classPath (sort)
+# - "Show me all Metal resources" via begins_with on classPath
+# - Partitioned by top-level category (Inorganic, Organic, Energy, Space Resource)
+#   to distribute items across partitions
 
 resource "aws_dynamodb_table" "resources" {
   name         = "resources"
@@ -67,6 +73,20 @@ resource "aws_dynamodb_table" "resources" {
     type = "S"
   }
 
+  # Used as partition key in the by-category GSI
+  # Top-level category: "Inorganic", "Organic", "Energy", "Space Resource"
+  attribute {
+    name = "classCategory"
+    type = "S"
+  }
+
+  # Used as sort key in the by-category GSI
+  # Materialized hierarchy path, e.g., "inorganic/mineral/metal/non-ferrous_metal/copper/desh_copper"
+  attribute {
+    name = "classPath"
+    type = "S"
+  }
+
   # GSI: query by planet
   # "All resources on Tatooine" -> query this index with planet = "Tatooine"
   # Sort by resourceClass so results are grouped by type
@@ -84,6 +104,19 @@ resource "aws_dynamodb_table" "resources" {
     name            = "by-class"
     hash_key        = "resourceClass"
     range_key       = "resourceName"
+    projection_type = "ALL"
+  }
+
+  # GSI: query by class hierarchy
+  # "All Metal resources" -> classCategory = "Inorganic",
+  #   begins_with(classPath, "inorganic/mineral/metal/")
+  # Partitioned by top-level category so items are distributed across
+  # DynamoDB partitions. The classPath sort key enables prefix queries
+  # for any level of the hierarchy.
+  global_secondary_index {
+    name            = "by-category"
+    hash_key        = "classCategory"
+    range_key       = "classPath"
     projection_type = "ALL"
   }
 

@@ -23,25 +23,113 @@
  *   (we retry those)
  */
 
-import { BatchWriteCommand } from "@aws-sdk/lib-dynamodb";
-import { createDocClient, RESOURCES_TABLE } from "../config.js";
+import { BatchWriteCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
+import { createDocClient, RESOURCES_TABLE, RESOURCE_CLASSES_TABLE } from "../config.js";
 import type { SWGResource, ResourceItem } from "../types.js";
 import { ALL_STAT_KEYS } from "../types.js";
 
 /** DynamoDB BatchWriteItem limit */
 const BATCH_SIZE = 25;
 
+// ─── Classification cache ────────────────────────────────────────────
+
+interface ClassInfo {
+  treePath: string;
+  className: string;
+  depth: number;
+}
+
+/**
+ * Load all resource class nodes from the resource-classes table.
+ * Returns a Map keyed by className (e.g., "Desh Copper").
+ */
+export async function loadClassCache(): Promise<Map<string, ClassInfo>> {
+  const docClient = createDocClient();
+  const cache = new Map<string, ClassInfo>();
+  let lastKey: Record<string, unknown> | undefined;
+
+  do {
+    const result = await docClient.send(
+      new ScanCommand({
+        TableName: RESOURCE_CLASSES_TABLE,
+        ProjectionExpression: "className, treePath, #d",
+        ExpressionAttributeNames: { "#d": "depth" },
+        ExclusiveStartKey: lastKey,
+      })
+    );
+
+    for (const item of result.Items ?? []) {
+      cache.set(item.className as string, {
+        treePath: item.treePath as string,
+        className: item.className as string,
+        depth: item.depth as number,
+      });
+    }
+
+    lastKey = result.LastEvaluatedKey as Record<string, unknown> | undefined;
+  } while (lastKey);
+
+  return cache;
+}
+
+/**
+ * Extract classification fields from the hierarchy cache.
+ * Returns classPath, classCategory (root level), classGroup (second level).
+ */
+export function getClassification(
+  cache: Map<string, ClassInfo>,
+  resourceClass: string
+): { classPath: string; classCategory: string; classGroup: string } | null {
+  const info = cache.get(resourceClass);
+  if (!info) return null;
+
+  const segments = info.treePath.split("/");
+
+  // Look up the actual classNames for proper casing at depth 0 and 1
+  let category: string | undefined;
+  let group: string | undefined;
+
+  if (segments.length >= 1) {
+    for (const [, node] of cache) {
+      if (node.depth === 0 && node.treePath === segments[0]) {
+        category = node.className;
+        break;
+      }
+    }
+  }
+
+  if (segments.length >= 2) {
+    const groupPath = segments.slice(0, 2).join("/");
+    for (const [, node] of cache) {
+      if (node.depth === 1 && node.treePath === groupPath) {
+        group = node.className;
+        break;
+      }
+    }
+  }
+
+  return {
+    classPath: info.treePath,
+    classCategory: category ?? segments[0] ?? "",
+    classGroup: group ?? segments[1] ?? "",
+  };
+}
+
 /**
  * Convert an SWGResource into one or more ResourceItems (one per planet).
+ * Enriches with classification data if a cache is provided.
  */
-export function denormalize(resource: SWGResource): ResourceItem[] {
+export function denormalize(
+  resource: SWGResource,
+  classCache?: Map<string, ClassInfo>
+): ResourceItem[] {
   // Safety net: skip resources with no valid planets
   // (should be caught by the parser, but just in case)
   if (resource.planets.length === 0) {
     return [];
   }
 
-  const baseItem = {
+  const baseItem: Record<string, unknown> = {
     resourceId: resource.resourceId,
     resourceName: resource.resourceName,
     resourceClass: resource.resourceClass,
@@ -50,6 +138,16 @@ export function denormalize(resource: SWGResource): ResourceItem[] {
     availableTimestamp: resource.availableTimestamp,
     availableBy: resource.availableBy,
   };
+
+  // Enrich with classification data if cache is available
+  if (classCache) {
+    const classification = getClassification(classCache, resource.resourceClass);
+    if (classification) {
+      baseItem.classPath = classification.classPath;
+      baseItem.classCategory = classification.classCategory;
+      baseItem.classGroup = classification.classGroup;
+    }
+  }
 
   // Flatten stats into top-level attributes
   const statsFlat: Record<string, number> = {};
@@ -76,8 +174,13 @@ export async function loadResources(
 ): Promise<number> {
   const docClient = createDocClient();
 
-  // Denormalize all resources into items
-  const allItems: ResourceItem[] = resources.flatMap(denormalize);
+  // Load classification cache for enrichment
+  console.log("  Loading classification cache...");
+  const classCache = await loadClassCache();
+  console.log(`  Classification cache: ${classCache.size} classes`);
+
+  // Denormalize all resources into items (with classification)
+  const allItems: ResourceItem[] = resources.flatMap((r) => denormalize(r, classCache));
   console.log(
     `  Denormalized ${resources.length} resources into ${allItems.length} items`
   );
@@ -142,7 +245,10 @@ export async function addResources(
   if (resources.length === 0) return 0;
 
   const docClient = createDocClient();
-  const allItems: ResourceItem[] = resources.flatMap(denormalize);
+
+  // Load classification cache for enrichment
+  const classCache = await loadClassCache();
+  const allItems: ResourceItem[] = resources.flatMap((r) => denormalize(r, classCache));
 
   console.log(
     `  Adding ${resources.length} new resources (${allItems.length} items)`

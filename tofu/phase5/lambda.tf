@@ -27,11 +27,12 @@ data "archive_file" "pipeline_lambda_placeholder" {
 
 locals {
   pipeline_env = {
-    LOCALSTACK_ENDPOINT = "http://host.docker.internal:4566"
-    AWS_REGION_CUSTOM   = var.aws_region
-    RAW_EXPORTS_BUCKET  = "swg-legends-raw-exports"
-    RESOURCES_TABLE     = "resources"
-    EVENT_LOG_TABLE     = "event-log"
+    LOCALSTACK_ENDPOINT    = "http://host.docker.internal:4566"
+    AWS_REGION_CUSTOM      = var.aws_region
+    RAW_EXPORTS_BUCKET     = "swg-legends-raw-exports"
+    RESOURCES_TABLE        = "resources"
+    EVENT_LOG_TABLE        = "event-log"
+    RESOURCE_CLASSES_TABLE = "resource-classes"
   }
 }
 

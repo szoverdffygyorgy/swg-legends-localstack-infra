@@ -48,7 +48,14 @@
     "dashboard:ops": "tsx src/export/generate-ops-dashboard.ts",
     "frontend:dev": "npm --prefix frontend run dev",
     "frontend:build": "npm --prefix frontend run build",
-    "frontend:deploy": "tsx scripts/deploy-frontend.ts"
+    "frontend:deploy": "tsx scripts/deploy-frontend.ts",
+    "scrape:tree": "tsx scripts/scrape-resource-tree.ts",
+    "tofu:init:classification": "tofu -chdir=tofu/classification init",
+    "tofu:plan:classification": "tofu -chdir=tofu/classification plan",
+    "tofu:apply:classification": "tofu -chdir=tofu/classification apply -auto-approve",
+    "tofu:destroy:classification": "tofu -chdir=tofu/classification destroy -auto-approve",
+    "seed:classes": "tsx scripts/seed-resource-classes.ts",
+    "backfill:classes": "tsx scripts/backfill-resource-classes.ts"
   },
   "dependencies": {
     "@aws-sdk/client-cloudwatch-events": "^3.1121.0",

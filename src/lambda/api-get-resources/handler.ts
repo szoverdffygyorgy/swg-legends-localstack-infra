@@ -1,29 +1,28 @@
 /**
- * Lambda handler: API — Get Resources
+ * Lambda handler: API -- Get Resources
  *
  * Serves two endpoints via API Gateway REST API (v1):
  *
- *   GET /resources          — list current resources with optional filters
- *   GET /resources/{id}     — get a specific resource by ID (all planets)
+ *   GET /resources          -- list current resources with optional filters
+ *   GET /resources/{id}     -- get a specific resource by ID (all planets)
  *
  * Query parameters for GET /resources:
- *   ?planet=Tatooine        — filter by planet  (uses by-planet GSI)
- *   ?class=Copper           — filter by class   (uses by-class GSI)
- *   ?stat=oq&min=800        — filter by stat threshold
- *   (no params)             — scan all resources
+ *   ?planet=Tatooine        -- filter by planet  (uses by-planet GSI)
+ *   ?class=Copper           -- filter by class hierarchy (uses by-category GSI)
+ *                              Matches the class itself AND all subclasses.
+ *                              e.g., ?class=Copper returns Desh Copper, Polysteel Copper, etc.
+ *   ?stat=oq&min=800        -- filter by stat threshold
+ *   (no params)             -- scan all resources
  *
- * This is a "Lambda Proxy Integration" handler. API Gateway passes the
- * full HTTP request as an event, and we return a complete HTTP response
- * (status code, headers, body). API Gateway doesn't transform anything —
- * it's just a pass-through.
- *
- * The query logic mirrors src/query/find-resources.ts but adapted for
- * Lambda's event format instead of CLI args.
+ * The class filter performs a hierarchical lookup: it finds the class node
+ * in the resource-classes table, gets its treePath, and queries the
+ * by-category GSI with begins_with to match all descendants.
  *
  * Environment variables (set in OpenTofu):
- *   LOCALSTACK_ENDPOINT  — LocalStack URL (for DynamoDB client)
- *   AWS_REGION_CUSTOM    — AWS region
- *   RESOURCES_TABLE      — DynamoDB table name for current resources
+ *   LOCALSTACK_ENDPOINT       -- LocalStack URL (for DynamoDB client)
+ *   AWS_REGION_CUSTOM         -- AWS region
+ *   RESOURCES_TABLE           -- DynamoDB table name for current resources
+ *   RESOURCE_CLASSES_TABLE    -- DynamoDB table name for class hierarchy
  */
 
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
@@ -31,12 +30,11 @@ import {
   DynamoDBDocumentClient,
   QueryCommand,
   ScanCommand,
+  GetCommand,
 } from "@aws-sdk/lib-dynamodb";
 import type { QueryCommandInput, ScanCommandInput } from "@aws-sdk/lib-dynamodb";
 
 // ─── Types ───────────────────────────────────────────────────────────
-// REST API v1 Lambda Proxy Integration event format.
-// Key fields: httpMethod, path, pathParameters, queryStringParameters, body.
 
 interface APIGatewayProxyEvent {
   httpMethod: string;
@@ -62,6 +60,9 @@ interface ResourceItem {
   allPlanets: string;
   availableTimestamp: number;
   availableBy: string;
+  classPath?: string;
+  classCategory?: string;
+  classGroup?: string;
   er?: number;
   cr?: number;
   cd?: number;
@@ -75,6 +76,12 @@ interface ResourceItem {
   ut?: number;
 }
 
+interface ClassInfo {
+  treePath: string;
+  className: string;
+  depth: number;
+}
+
 const VALID_STATS = ["er", "cr", "cd", "dr", "fl", "hr", "ma", "pe", "oq", "sr", "ut"];
 
 // ─── Config ──────────────────────────────────────────────────────────
@@ -82,17 +89,53 @@ const VALID_STATS = ["er", "cr", "cd", "dr", "fl", "hr", "ma", "pe", "oq", "sr",
 const endpoint = process.env.LOCALSTACK_ENDPOINT || "http://localhost:4566";
 const region = process.env.AWS_REGION_CUSTOM || process.env.AWS_REGION || "us-east-1";
 const tableName = process.env.RESOURCES_TABLE || "resources";
+const classesTableName = process.env.RESOURCE_CLASSES_TABLE || "resource-classes";
 
 const ddbClient = new DynamoDBClient({ endpoint, region });
 const docClient = DynamoDBDocumentClient.from(ddbClient, {
   marshallOptions: { removeUndefinedValues: true },
 });
 
+// ─── Classification cache ────────────────────────────────────────────
+// Loaded on cold start, cached across invocations.
+// Maps className (e.g., "Copper") -> { treePath, className, depth }
+
+let classCache: Map<string, ClassInfo> | null = null;
+
+async function loadClassCache(): Promise<Map<string, ClassInfo>> {
+  if (classCache) return classCache;
+
+  console.log(`Loading classification cache from ${classesTableName}...`);
+  const cache = new Map<string, ClassInfo>();
+  let lastKey: Record<string, unknown> | undefined;
+
+  do {
+    const result = await docClient.send(
+      new ScanCommand({
+        TableName: classesTableName,
+        ProjectionExpression: "className, treePath, #d",
+        ExpressionAttributeNames: { "#d": "depth" },
+        ExclusiveStartKey: lastKey,
+      })
+    );
+
+    for (const item of result.Items ?? []) {
+      cache.set(item.className as string, {
+        treePath: item.treePath as string,
+        className: item.className as string,
+        depth: item.depth as number,
+      });
+    }
+
+    lastKey = result.LastEvaluatedKey as Record<string, unknown> | undefined;
+  } while (lastKey);
+
+  console.log(`Classification cache loaded: ${cache.size} classes`);
+  classCache = cache;
+  return cache;
+}
+
 // ─── CORS headers ────────────────────────────────────────────────────
-// REST API v1 doesn't have built-in CORS like HTTP API v2.
-// Each Lambda response must include these headers for browsers to
-// accept the response. The OPTIONS preflight is handled by MOCK
-// integrations in OpenTofu (api-gateway.tf).
 
 const CORS_HEADERS = {
   "Content-Type": "application/json",
@@ -109,6 +152,18 @@ function jsonResponse(statusCode: number, body: unknown): APIGatewayProxyResult 
     headers: CORS_HEADERS,
     body: JSON.stringify(body),
   };
+}
+
+/**
+ * Convert a class name to a slugified ID (matching the scrape script's logic).
+ * "Desh Copper" -> "desh_copper"
+ */
+function slugify(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/'/g, "")
+    .replace(/[^a-z0-9-]+/g, "_")
+    .replace(/^_+|_+$/g, "");
 }
 
 // ─── Query functions ─────────────────────────────────────────────────
@@ -136,11 +191,68 @@ async function queryByPlanet(
   return (result.Items ?? []) as ResourceItem[];
 }
 
+/**
+ * Query resources by class hierarchy using the by-category GSI.
+ * Looks up the class in the hierarchy to find its treePath and category,
+ * then queries with begins_with to match all descendants.
+ *
+ * Falls back to exact match on by-class GSI if the class isn't found
+ * in the hierarchy (backward compatibility).
+ */
 async function queryByClass(
   resourceClass: string,
   filterStat?: string,
-  minValue?: number
+  minValue?: number,
+  cache?: Map<string, ClassInfo>
 ): Promise<ResourceItem[]> {
+  // Try hierarchical query first
+  if (cache) {
+    const classInfo = cache.get(resourceClass);
+    if (classInfo) {
+      // Find the category (root ancestor) from the treePath
+      const segments = classInfo.treePath.split("/");
+      let category: string | undefined;
+      for (const [, node] of cache) {
+        if (node.depth === 0 && node.treePath === segments[0]) {
+          category = node.className;
+          break;
+        }
+      }
+
+      if (category) {
+        const input: QueryCommandInput = {
+          TableName: tableName,
+          IndexName: "by-category",
+          ExpressionAttributeValues: { ":cat": category },
+        };
+
+        if (classInfo.depth === 0) {
+          // Root category: get everything in this category
+          input.KeyConditionExpression = "classCategory = :cat";
+        } else if (!isLeafNode(resourceClass, cache)) {
+          // Branch node: get all descendants
+          // Append "/" so "copper" doesn't match "copper_something" at the same level
+          input.KeyConditionExpression = "classCategory = :cat AND begins_with(classPath, :prefix)";
+          (input.ExpressionAttributeValues as Record<string, unknown>)[":prefix"] = classInfo.treePath + "/";
+        } else {
+          // Leaf node: exact match on classPath
+          input.KeyConditionExpression = "classCategory = :cat AND classPath = :exact";
+          (input.ExpressionAttributeValues as Record<string, unknown>)[":exact"] = classInfo.treePath;
+        }
+
+        if (filterStat && minValue !== undefined) {
+          input.FilterExpression = "#stat >= :minVal";
+          input.ExpressionAttributeNames = { "#stat": filterStat };
+          (input.ExpressionAttributeValues as Record<string, unknown>)[":minVal"] = minValue;
+        }
+
+        const result = await docClient.send(new QueryCommand(input));
+        return (result.Items ?? []) as ResourceItem[];
+      }
+    }
+  }
+
+  // Fallback: exact match on by-class GSI (legacy behavior)
   const expressionValues: Record<string, unknown> = { ":cls": resourceClass };
   const input: QueryCommandInput = {
     TableName: tableName,
@@ -157,6 +269,21 @@ async function queryByClass(
 
   const result = await docClient.send(new QueryCommand(input));
   return (result.Items ?? []) as ResourceItem[];
+}
+
+/**
+ * Check if a class name corresponds to a leaf node (no children).
+ */
+function isLeafNode(className: string, cache: Map<string, ClassInfo>): boolean {
+  const info = cache.get(className);
+  if (!info) return true; // assume leaf if unknown
+
+  // Check if any other node's path starts with this node's path + "/"
+  const prefix = info.treePath + "/";
+  for (const [, node] of cache) {
+    if (node.treePath.startsWith(prefix)) return false;
+  }
+  return true;
 }
 
 async function queryById(resourceId: string): Promise<ResourceItem[]> {
@@ -198,8 +325,11 @@ export async function handler(
 
   console.log(`API: ${method} ${path}`, JSON.stringify(params));
 
+  // Load classification cache (cached across invocations)
+  const cache = await loadClassCache();
+
   try {
-    // GET /resources/{id} — specific resource by ID
+    // GET /resources/{id} -- specific resource by ID
     if (pathParams.id) {
       const items = await queryById(pathParams.id);
       if (items.length === 0) {
@@ -218,6 +348,9 @@ export async function handler(
         planets: items.map((i) => i.planet),
         availableTimestamp: first.availableTimestamp,
         availableBy: first.availableBy,
+        classPath: first.classPath,
+        classCategory: first.classCategory,
+        classGroup: first.classGroup,
         stats: Object.fromEntries(
           VALID_STATS
             .filter((s) => (first as Record<string, unknown>)[s] !== undefined)
@@ -226,7 +359,7 @@ export async function handler(
       });
     }
 
-    // GET /resources — list with filters
+    // GET /resources -- list with filters
     const { planet, class: resourceClass, stat, min } = params;
 
     // Validate stat filter
@@ -251,7 +384,7 @@ export async function handler(
     if (planet) {
       items = await queryByPlanet(planet, stat, minValue);
     } else if (resourceClass) {
-      items = await queryByClass(resourceClass, stat, minValue);
+      items = await queryByClass(resourceClass, stat, minValue, cache);
     } else {
       items = await scanAll(stat, minValue);
     }

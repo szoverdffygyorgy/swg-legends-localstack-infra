@@ -103,6 +103,19 @@ export interface ResourceItem {
   /** Reporter name */
   availableBy: string;
 
+  // Classification fields -- populated by looking up resourceClass
+  // in the resource-classes hierarchy table at ingestion time.
+  // Optional because legacy items may not have been backfilled yet.
+
+  /** Materialized hierarchy path (e.g., "inorganic/mineral/metal/non-ferrous_metal/copper/desh_copper") */
+  classPath?: string;
+
+  /** Top-level category (e.g., "Inorganic", "Organic", "Energy", "Space Resource") */
+  classCategory?: string;
+
+  /** Second-level group (e.g., "Mineral", "Creature Resources", "Renewable Energy") */
+  classGroup?: string;
+
   // Stats are stored as top-level number attributes.
   // Only present if the resource class has that stat.
   er?: number;
@@ -156,6 +169,50 @@ export interface DataIssue {
 
   /** Raw planet data from the XML (for debugging) */
   rawPlanets: string;
+}
+
+// ─── Resource class hierarchy ────────────────────────────────────────
+// Represents a node in SWG's resource class tree. The tree has 816 nodes
+// (104 branch, 712 leaf) across 4 root categories: Energy, Inorganic,
+// Organic, Space Resource. Max depth is 6.
+//
+// Leaf nodes are the actual resource types that spawn in-game (e.g.,
+// "Desh Copper"). Branch nodes are groupings (e.g., "Copper", "Metal").
+// Each node has stat caps defining the min/max possible values for
+// resources of that class.
+
+export interface ResourceClassNode {
+  /** Slugified class name, used as DynamoDB primary key (e.g., "desh_copper") */
+  classId: string;
+
+  /** Human-readable class name (e.g., "Desh Copper") */
+  className: string;
+
+  /** Parent's classId, or null for root nodes (e.g., "copper") */
+  parentClassId: string | null;
+
+  /** Parent's human-readable name, or null for root nodes */
+  parentName: string | null;
+
+  /**
+   * Materialized path from root to this node, slash-separated.
+   * e.g., "inorganic/mineral/metal/non-ferrous_metal/copper/desh_copper"
+   * Enables prefix queries: begins_with(path, "inorganic/mineral/metal")
+   * matches all metals.
+   */
+  path: string;
+
+  /** Depth in the tree (0 = root categories like "Inorganic") */
+  depth: number;
+
+  /** True if this is a leaf node (actual spawnable resource type) */
+  isLeaf: boolean;
+
+  /**
+   * Min/max stat caps for this class. Only includes stats that apply.
+   * e.g., { cr: { min: 1, max: 116 }, cd: { min: 500, max: 572 } }
+   */
+  statCaps: Partial<Record<StatKey, { min: number; max: number }>>;
 }
 
 // ─── Event log item ──────────────────────────────────────────────────

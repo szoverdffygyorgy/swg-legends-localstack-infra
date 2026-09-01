@@ -9,6 +9,9 @@ export interface ResourceItem {
   allPlanets: string;
   availableTimestamp: number;
   availableBy: string;
+  classPath?: string;
+  classCategory?: string;
+  classGroup?: string;
   er?: number;
   cr?: number;
   cd?: number;
@@ -42,6 +45,9 @@ export interface SingleResourceResponse {
   availableTimestamp: number;
   availableBy: string;
   stats: Record<string, number>;
+  classPath?: string;
+  classCategory?: string;
+  classGroup?: string;
 }
 
 export interface EventLogItem {

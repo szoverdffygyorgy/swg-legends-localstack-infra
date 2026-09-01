@@ -86,6 +86,9 @@ export const RESOURCES_TABLE = "resources";
 /** DynamoDB table name for historical resource data */
 export const RESOURCE_HISTORY_TABLE = "resource-history";
 
+/** DynamoDB table name for resource class hierarchy and stat caps */
+export const RESOURCE_CLASSES_TABLE = "resource-classes";
+
 /** SWGAide export URL for SWG Legends (server 138) current resources */
 export const SWGAIDE_RESOURCES_URL =
   "https://swgaide.com/pub/exports/currentresources_138.xml.gz";

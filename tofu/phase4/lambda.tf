@@ -40,9 +40,10 @@ resource "aws_lambda_function" "api_get_resources" {
 
   environment {
     variables = {
-      LOCALSTACK_ENDPOINT = "http://host.docker.internal:4566"
-      AWS_REGION_CUSTOM   = var.aws_region
-      RESOURCES_TABLE     = "resources"
+      LOCALSTACK_ENDPOINT    = "http://host.docker.internal:4566"
+      AWS_REGION_CUSTOM      = var.aws_region
+      RESOURCES_TABLE        = "resources"
+      RESOURCE_CLASSES_TABLE = "resource-classes"
     }
   }
 

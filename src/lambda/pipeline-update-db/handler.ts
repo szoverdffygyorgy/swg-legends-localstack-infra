@@ -5,18 +5,24 @@
  * Reads the diff from S3, adds spawned resources and removes despawned
  * resources from the resources DynamoDB table.
  *
+ * Enriches each spawned resource with classification data (hierarchy path,
+ * category, group) by looking up the resource class in the resource-classes
+ * table. The classification cache is loaded on cold start and reused across
+ * invocations within the same Lambda container.
+ *
  * Input:  { diffS3Key: string, xmlS3Key: string, spawnedCount: number, ... }
  * Output: { ...input, itemsAdded: number, itemsRemoved: number }
  */
 
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, BatchWriteCommand } from "@aws-sdk/lib-dynamodb";
+import { DynamoDBDocumentClient, BatchWriteCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
 
 // ─── Config ──────────────────────────────────────────────────────────
 
 const BUCKET = process.env.RAW_EXPORTS_BUCKET || "swg-legends-raw-exports";
 const RESOURCES_TABLE = process.env.RESOURCES_TABLE || "resources";
+const RESOURCE_CLASSES_TABLE = process.env.RESOURCE_CLASSES_TABLE || "resource-classes";
 const endpoint = process.env.LOCALSTACK_ENDPOINT || "http://localhost:4566";
 const region = process.env.AWS_REGION_CUSTOM || process.env.AWS_REGION || "us-east-1";
 const BATCH_SIZE = 25;
@@ -63,10 +69,120 @@ interface SWGResource {
   availableBy: string;
 }
 
+interface ClassInfo {
+  treePath: string;
+  className: string;
+  depth: number;
+}
+
+// ─── Classification cache ────────────────────────────────────────────
+// Loaded once on cold start, reused across invocations.
+// Maps className (e.g., "Desh Copper") -> classification data.
+
+let classCache: Map<string, ClassInfo> | null = null;
+
+async function loadClassCache(): Promise<Map<string, ClassInfo>> {
+  if (classCache) return classCache;
+
+  console.log(`Loading classification cache from ${RESOURCE_CLASSES_TABLE}...`);
+  const cache = new Map<string, ClassInfo>();
+  let lastKey: Record<string, unknown> | undefined;
+
+  do {
+    const result = await docClient.send(
+      new ScanCommand({
+        TableName: RESOURCE_CLASSES_TABLE,
+        ProjectionExpression: "className, treePath, #d",
+        ExpressionAttributeNames: { "#d": "depth" },
+        ExclusiveStartKey: lastKey,
+      })
+    );
+
+    for (const item of result.Items ?? []) {
+      cache.set(item.className as string, {
+        treePath: item.treePath as string,
+        className: item.className as string,
+        depth: item.depth as number,
+      });
+    }
+
+    lastKey = result.LastEvaluatedKey as Record<string, unknown> | undefined;
+  } while (lastKey);
+
+  console.log(`Classification cache loaded: ${cache.size} classes`);
+  classCache = cache;
+  return cache;
+}
+
+/**
+ * Extract classification fields from a treePath.
+ * Path format: "inorganic/mineral/metal/non-ferrous_metal/copper/desh_copper"
+ *
+ * Returns { classPath, classCategory, classGroup } or undefined fields
+ * if the class is not found in the hierarchy.
+ */
+function getClassification(
+  cache: Map<string, ClassInfo>,
+  resourceClass: string
+): { classPath: string; classCategory: string; classGroup: string } | null {
+  const info = cache.get(resourceClass);
+  if (!info) return null;
+
+  const segments = info.treePath.split("/");
+
+  // Category = root level (depth 0), e.g., "inorganic" -> "Inorganic"
+  // Group = second level (depth 1), e.g., "mineral" -> "Mineral"
+  // We need to look up the actual classNames for proper casing.
+  // Since the path uses slugs, we find the matching nodes by their path prefix.
+  // For simplicity, we look up by iterating the cache for nodes at depth 0 and 1
+  // whose slug matches the path segment. But that's expensive.
+  //
+  // Simpler approach: capitalize the slug segments back to readable names.
+  // But this loses proper casing (e.g., "non-ferrous_metal" -> ???).
+  //
+  // Best approach: look up category and group from the cache directly.
+  // The category node's className matches the first path segment,
+  // and the group node's className matches the second.
+
+  let category: string | undefined;
+  let group: string | undefined;
+
+  if (segments.length >= 1) {
+    // Find the root node whose treePath equals the first segment
+    for (const [, node] of cache) {
+      if (node.depth === 0 && node.treePath === segments[0]) {
+        category = node.className;
+        break;
+      }
+    }
+  }
+
+  if (segments.length >= 2) {
+    const groupPath = segments.slice(0, 2).join("/");
+    for (const [, node] of cache) {
+      if (node.depth === 1 && node.treePath === groupPath) {
+        group = node.className;
+        break;
+      }
+    }
+  }
+
+  return {
+    classPath: info.treePath,
+    classCategory: category ?? segments[0] ?? "",
+    classGroup: group ?? segments[1] ?? "",
+  };
+}
+
 // ─── Denormalize (same logic as load-resources.ts) ───────────────────
 
-function denormalize(resource: SWGResource): Record<string, unknown>[] {
-  const base = {
+function denormalize(
+  resource: SWGResource,
+  cache: Map<string, ClassInfo>
+): Record<string, unknown>[] {
+  const classification = getClassification(cache, resource.resourceClass);
+
+  const base: Record<string, unknown> = {
     resourceId: resource.resourceId,
     resourceName: resource.resourceName,
     resourceClass: resource.resourceClass,
@@ -75,6 +191,13 @@ function denormalize(resource: SWGResource): Record<string, unknown>[] {
     availableTimestamp: resource.availableTimestamp,
     availableBy: resource.availableBy,
   };
+
+  // Add classification fields if available
+  if (classification) {
+    base.classPath = classification.classPath;
+    base.classCategory = classification.classCategory;
+    base.classGroup = classification.classGroup;
+  }
 
   const statsFlat: Record<string, number> = {};
   for (const key of ALL_STAT_KEYS) {
@@ -95,6 +218,9 @@ function denormalize(resource: SWGResource): Record<string, unknown>[] {
 export async function handler(event: UpdateInput): Promise<UpdateOutput> {
   console.log(`Step 4: Updating DynamoDB`);
 
+  // Load classification cache (cached across invocations)
+  const cache = await loadClassCache();
+
   // Read diff from S3
   const s3Response = await s3.send(
     new GetObjectCommand({ Bucket: BUCKET, Key: event.diffS3Key })
@@ -104,10 +230,17 @@ export async function handler(event: UpdateInput): Promise<UpdateOutput> {
   let itemsAdded = 0;
   let itemsRemoved = 0;
 
-  // Add spawned resources
+  // Add spawned resources (enriched with classification)
   if (diff.spawned.length > 0) {
-    const items = diff.spawned.flatMap(denormalize);
+    const items = diff.spawned.flatMap((r: SWGResource) => denormalize(r, cache));
     console.log(`Adding ${diff.spawned.length} resources (${items.length} items)`);
+
+    // Count how many were classified
+    const classified = items.filter((i: Record<string, unknown>) => i.classPath).length;
+    const unclassified = items.length - classified;
+    if (unclassified > 0) {
+      console.warn(`Warning: ${unclassified} items could not be classified (unknown resource class)`);
+    }
 
     for (let i = 0; i < items.length; i += BATCH_SIZE) {
       const batch = items.slice(i, i + BATCH_SIZE);
