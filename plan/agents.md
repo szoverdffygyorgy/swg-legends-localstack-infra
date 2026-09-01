@@ -14,7 +14,7 @@ All AWS services run locally via **LocalStack** (Docker). Zero cloud costs. The 
 - **Phase 3: Compute (Lambda)** -- COMPLETE
 - **Phase 4: API Layer (API Gateway)** -- COMPLETE
 - **Phase 5: Orchestration (Step Functions)** -- COMPLETE
-- Phase 6: Events & Monitoring (EventBridge + CloudWatch) -- planned
+- **Phase 6: Events & Monitoring (EventBridge + CloudWatch)** -- COMPLETE
 
 ## Key Conventions
 
@@ -77,6 +77,13 @@ swg-legends-localstack-infra/
       lambda.tf               # 7 pipeline Lambda functions
       step-functions.tf       # State machine definition (ASL)
       outputs.tf              # State machine ARN + start command
+    phase6/
+      main.tf                 # Phase 6 provider config
+      iam.tf                  # EventBridge -> Step Functions execution role
+      eventbridge.tf          # Scheduled rule (2h) + failure detection rule
+      sns.tf                  # pipeline-alerts SNS topic
+      cloudwatch.tf           # Dashboard definition + pipeline failure alarm
+      outputs.tf              # Schedule details, dashboard name, alarm name
   src/
     config.ts                 # Shared AWS client factories + constants
     types.ts                  # SWGResource, ResourceItem, DiffResult, EventLogItem types
@@ -103,6 +110,7 @@ swg-legends-localstack-infra/
       event-log.ts            # Query spawn/despawn events by date
     export/
       generate-dashboard.ts   # Generate Bazaar Terminal HTML dashboard
+      generate-ops-dashboard.ts # Generate operations HTML dashboard
     lambda/
       alert-evaluator/
         handler.ts            # Lambda: evaluate spawns against alert rules
@@ -170,6 +178,9 @@ swg-legends-localstack-infra/
 | `npm run tofu:apply:phase5` | Apply Phase 5 infrastructure |
 | `npm run pipeline:start` | Start a Step Functions ingestion pipeline execution |
 | `npm run pipeline:status` | Check pipeline execution status (last 5 runs) |
+| `npm run tofu:init:phase6` | Initialize Phase 6 OpenTofu |
+| `npm run tofu:apply:phase6` | Apply Phase 6 infrastructure |
+| `npm run dashboard:ops` | Generate operations HTML dashboard |
 
 ## Known Future Additions
 

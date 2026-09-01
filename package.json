@@ -40,9 +40,15 @@
     "tofu:apply:phase5": "tofu -chdir=tofu/phase5 apply -auto-approve",
     "tofu:destroy:phase5": "tofu -chdir=tofu/phase5 destroy -auto-approve",
     "pipeline:start": "tsx src/pipeline/start.ts",
-    "pipeline:status": "tsx src/pipeline/status.ts"
+    "pipeline:status": "tsx src/pipeline/status.ts",
+    "tofu:init:phase6": "tofu -chdir=tofu/phase6 init",
+    "tofu:plan:phase6": "tofu -chdir=tofu/phase6 plan",
+    "tofu:apply:phase6": "tofu -chdir=tofu/phase6 apply -auto-approve",
+    "tofu:destroy:phase6": "tofu -chdir=tofu/phase6 destroy -auto-approve",
+    "dashboard:ops": "tsx src/export/generate-ops-dashboard.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-cloudwatch-events": "^3.1121.0",
     "@aws-sdk/client-dynamodb": "^3.0.0",
     "@aws-sdk/client-lambda": "^3.1121.0",
     "@aws-sdk/client-s3": "^3.0.0",
