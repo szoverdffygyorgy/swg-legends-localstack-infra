@@ -2,11 +2,13 @@
 
 ## Purpose
 
-A local AWS infrastructure learning project. The user is a software engineer learning AWS services hands-on by building a real tool: a crafting and resource intelligence system for the Star Wars Galaxies (SWG) Legends MMORPG server.
+A local AWS infrastructure learning project. The user is a software engineer who learned AWS services hands-on by building a real tool: a crafting and resource intelligence system for the Star Wars Galaxies (SWG) Legends MMORPG server.
 
 All AWS services run locally via **LocalStack** (Docker). Zero cloud costs. The SWG theme provides real data and real use cases to make the learning concrete.
 
 ## Current Status
+
+All phases complete. The system is fully operational.
 
 - **Phase 0: Foundation** -- COMPLETE
 - **Phase 1: Storage (S3 + DynamoDB)** -- COMPLETE
@@ -15,13 +17,14 @@ All AWS services run locally via **LocalStack** (Docker). Zero cloud costs. The 
 - **Phase 4: API Layer (API Gateway)** -- COMPLETE
 - **Phase 5: Orchestration (Step Functions)** -- COMPLETE
 - **Phase 6: Events & Monitoring (EventBridge + CloudWatch)** -- COMPLETE
+- **React Frontend** -- COMPLETE (Vite + React 19 + React Router 7)
 
 ## Key Conventions
 
 | Convention | Detail |
 |------------|--------|
 | IaC tool | **OpenTofu** (NOT Terraform). Commands use `tofu`, not `terraform`. |
-| Language | TypeScript |
+| Language | TypeScript (backend + Lambda + frontend) |
 | AWS emulation | LocalStack at `http://localhost:4566` |
 | AWS region | `us-east-1` (arbitrary, LocalStack doesn't care) |
 | AWS credentials | Dummy values (`test` / `test`) -- LocalStack ignores them but SDK requires them |
@@ -31,84 +34,93 @@ All AWS services run locally via **LocalStack** (Docker). Zero cloud costs. The 
 | Data source | swgaide.com XML exports, SWG Legends server ID 138 |
 | LocalStack auth | Requires `LOCALSTACK_AUTH_TOKEN` in `.env` (free Hobby tier) |
 | Corporate proxy | Ion Group HTTPS interception; combined CA bundle mounted in Docker |
+| Frontend | React 19 + Vite 6 + React Router 7, in `frontend/` directory (separate npm project) |
+| Frontend theme | SWG NGE in-game UI palette: dark navy, pale blue text, warm gold accents |
+| Lambda build | esbuild bundle → zip → deploy via `npm run lambda:build` (12 functions total) |
+
+## Quick Start from Scratch
+
+After `npm run localstack:reset` or a fresh clone:
+
+```bash
+# 1. Start LocalStack
+npm run localstack:up
+
+# 2. Provision all infrastructure (order matters -- phases reference each other's resources)
+tofu -chdir=tofu/phase1 init && tofu -chdir=tofu/phase1 apply -auto-approve
+tofu -chdir=tofu/phase2 init && tofu -chdir=tofu/phase2 apply -auto-approve
+tofu -chdir=tofu/phase3 init && tofu -chdir=tofu/phase3 apply -auto-approve
+tofu -chdir=tofu/phase4 init && tofu -chdir=tofu/phase4 apply -auto-approve
+tofu -chdir=tofu/phase5 init && tofu -chdir=tofu/phase5 apply -auto-approve
+tofu -chdir=tofu/phase6 init && tofu -chdir=tofu/phase6 apply -auto-approve
+tofu -chdir=tofu/frontend init && tofu -chdir=tofu/frontend apply -auto-approve
+
+# 3. Build and deploy all 12 Lambda functions
+npm run lambda:build
+
+# 4. Ingest data (first run = full load, subsequent = diff-based)
+npm run ingest
+
+# 5. Add alert rules
+npm run alerts:add -- --name "Good Copper" --class Copper --stat oq --min 800
+npm run alerts:add -- --name "Any Reactive Gas" --class "Reactive Gas"
+
+# 6. Verify API
+npm run api:test
+
+# 7. Start frontend
+npm run frontend:dev       # Dev server at http://localhost:3000
+# OR
+npm run frontend:deploy    # Build + upload to S3 static hosting
+```
 
 ## Project Structure
 
 ```
 swg-legends-localstack-infra/
   docker-compose.yml          # LocalStack container (with corporate proxy CA workaround)
-  package.json                # TypeScript project, AWS SDK v3, npm scripts
-  tsconfig.json               # TypeScript compiler config
+  package.json                # Backend TypeScript project, AWS SDK v3, npm scripts
+  tsconfig.json               # Backend TypeScript compiler config
   CHEATSHEET.md               # Copy-paste command reference
   .gitignore
   .env                        # LocalStack auth token (gitignored)
   .env.example                # Template for .env
   certs/                      # Corporate proxy CA bundle (gitignored)
   plan/
-    handoff.md                # Full project backstory and phase plan
+    handoff.md                # Full project backstory, decisions, phase outcomes
     agents.md                 # This file -- AI agent context
   tofu/
     main.tf                   # Root provider config (Phase 0)
     variables.tf              # Shared variables
-    phase1/
-      main.tf                 # Phase 1 provider config
-      s3.tf                   # swg-legends-raw-exports bucket
-      dynamodb.tf             # resources + resource-history tables
-    phase2/
-      main.tf                 # Phase 2 provider config
-      sns.tf                  # resource-spawned + resource-despawned topics
-      sqs.tf                  # history-recorder + alert-evaluator queues + DLQs
-      subscriptions.tf        # SNS -> SQS fan-out wiring + queue policies
-      dynamodb.tf             # event-log + alert-rules tables
-    phase3/
-      main.tf                 # Phase 3 provider config
-      iam.tf                  # Lambda execution role + DynamoDB/SQS/Logs policies
-      lambda.tf               # alert-evaluator + history-recorder Lambda definitions
-      event-sources.tf        # SQS -> Lambda event source mappings
-    phase4/
-      main.tf                 # Phase 4 provider config
-      iam.tf                  # API Lambda execution role + DynamoDB/Logs policies
-      lambda.tf               # api-get-resources + api-get-events + api-alerts Lambdas
-      api-gateway.tf          # REST API, resources, methods, integrations, deployment, stage
-      outputs.tf              # API base URL + example curl commands
-    phase5/
-      main.tf                 # Phase 5 provider config
-      iam.tf                  # Pipeline Lambda + Step Functions execution roles
-      lambda.tf               # 7 pipeline Lambda functions
-      step-functions.tf       # State machine definition (ASL)
-      outputs.tf              # State machine ARN + start command
-    phase6/
-      main.tf                 # Phase 6 provider config
-      iam.tf                  # EventBridge -> Step Functions execution role
-      eventbridge.tf          # Scheduled rule (2h) + failure detection rule
-      sns.tf                  # pipeline-alerts SNS topic
-      cloudwatch.tf           # Dashboard definition + pipeline failure alarm
-      outputs.tf              # Schedule details, dashboard name, alarm name
-    frontend/
-      main.tf                 # S3 bucket + website hosting + public access policy
-  frontend/                     # React frontend (separate npm project)
-    package.json                # Vite + React + TypeScript
-    tsconfig.json               # TypeScript config
-    vite.config.ts              # Dev server + API proxy to LocalStack
-    index.html                  # Vite entry point
+    phase1/                   # S3 bucket + DynamoDB tables (resources, resource-history)
+    phase2/                   # SNS topics + SQS queues + DynamoDB tables (event-log, alert-rules)
+    phase3/                   # Lambda functions (alert-evaluator, history-recorder) + IAM + SQS event sources
+    phase4/                   # API Gateway REST API (7 endpoints) + 3 API Lambdas + IAM
+    phase5/                   # Step Functions state machine + 7 pipeline Lambdas + IAM
+    phase6/                   # EventBridge rules + CloudWatch dashboard/alarm + SNS topic
+    frontend/                 # S3 bucket + website hosting config
+  frontend/                   # React frontend (separate npm project)
+    package.json              # Vite + React + TypeScript
+    tsconfig.json             # Frontend TypeScript config
+    vite.config.ts            # Dev server + API proxy to LocalStack
+    index.html                # Vite entry point
     src/
-      main.tsx                  # React root mount
-      App.tsx                   # Routes: /resources, /events, /alerts
-      vite-env.d.ts             # CSS module declarations
+      main.tsx                # React root mount
+      App.tsx                 # Routes: /resources, /events, /alerts
       api/
-        client.ts               # Typed fetch wrapper for all API endpoints
-        types.ts                # Response types matching Lambda output
+        client.ts             # Typed fetch wrapper for all API endpoints
+        types.ts              # Response types matching Lambda output
       pages/
-        Resources.tsx           # Resource table with filters + sorting
-        Events.tsx              # Event feed with date picker + type filter
-        Alerts.tsx              # Alert rules CRUD + fired alert history
+        Resources.tsx         # Resource table with filters + sorting
+        Events.tsx            # Event feed with date picker + type filter
+        Alerts.tsx            # Alert rules CRUD + fired alert history
       components/
-        Layout.tsx              # Header, nav tabs, content area, footer
-        StatusBadge.tsx         # Colored status pill (SPAWNED/DESPAWNED/etc.)
-        LoadingSpinner.tsx      # Loading state
-        ErrorMessage.tsx        # Error display with retry button
+        Layout.tsx            # Header, nav tabs, content area, footer
+        StatusBadge.tsx       # Colored status pill
+        LoadingSpinner.tsx    # Loading state
+        ErrorMessage.tsx      # Error display with retry button
       styles/
-        theme.css               # SWG NGE color palette (CSS custom properties)
+        theme.css             # SWG NGE color palette (CSS custom properties)
   src/
     config.ts                 # Shared AWS client factories + constants
     types.ts                  # SWGResource, ResourceItem, DiffResult, EventLogItem types
@@ -120,7 +132,7 @@ swg-legends-localstack-infra/
       load-resources.ts       # Full load + incremental add/remove for DynamoDB
       log-events.ts           # Write spawn/despawn events to event-log table
       upload-to-s3.ts         # Archive raw XML to S3
-      pipeline.ts             # Orchestrate full ingestion flow (7 steps)
+      pipeline.ts             # Orchestrate full ingestion flow (direct/local version)
     messaging/
       publish-events.ts       # Publish spawn/despawn events to SNS topics
       process-history.ts      # SQS consumer: despawn events -> resource-history table
@@ -137,84 +149,89 @@ swg-legends-localstack-infra/
       generate-dashboard.ts   # Generate Bazaar Terminal HTML dashboard
       generate-ops-dashboard.ts # Generate operations HTML dashboard
     lambda/
-      alert-evaluator/
-        handler.ts            # Lambda: evaluate spawns against alert rules
-      history-recorder/
-        handler.ts            # Lambda: record despawns to history table
-      api-get-resources/
-        handler.ts            # Lambda: GET /resources, GET /resources/{id}
-      api-get-events/
-        handler.ts            # Lambda: GET /events
-      api-alerts/
-        handler.ts            # Lambda: /alerts/rules CRUD + /alerts/history
-      pipeline-download/
-        handler.ts            # Lambda: download SWGAide XML, upload to S3
-      pipeline-parse/
-        handler.ts            # Lambda: parse XML, write JSON to S3
-      pipeline-diff/
-        handler.ts            # Lambda: diff parsed data against DynamoDB
-      pipeline-update-db/
-        handler.ts            # Lambda: add spawned / remove despawned
-      pipeline-log-events/
-        handler.ts            # Lambda: write events to event-log table
-      pipeline-publish-sns/
-        handler.ts            # Lambda: publish spawn/despawn to SNS
-      pipeline-archive/
-        handler.ts            # Lambda: archive XML to permanent S3 path
+      alert-evaluator/        # Phase 3: evaluate spawns against alert rules (SQS-triggered)
+      history-recorder/       # Phase 3: record despawns to history table (SQS-triggered)
+      api-get-resources/      # Phase 4: GET /resources, GET /resources/{id}
+      api-get-events/         # Phase 4: GET /events
+      api-alerts/             # Phase 4: /alerts/rules CRUD + /alerts/history
+      pipeline-download/      # Phase 5: download SWGAide XML, upload to S3
+      pipeline-parse/         # Phase 5: parse XML, write JSON to S3
+      pipeline-diff/          # Phase 5: diff parsed data against DynamoDB
+      pipeline-update-db/     # Phase 5: add spawned / remove despawned
+      pipeline-log-events/    # Phase 5: write events to event-log table
+      pipeline-publish-sns/   # Phase 5: publish spawn/despawn to SNS
+      pipeline-archive/       # Phase 5: archive XML to permanent S3 path
     api/
-      test-api.ts             # Smoke test for all API endpoints
+      test-api.ts             # Smoke test for all 15 API endpoint tests
     pipeline/
       start.ts                # Start a Step Functions pipeline execution
       status.ts               # Check pipeline execution status
   scripts/
-    build-lambdas.ts          # esbuild bundle + zip + deploy Lambdas to LocalStack
+    build-lambdas.ts          # esbuild bundle + zip + deploy all 12 Lambdas to LocalStack
     deploy-frontend.ts        # Build React app + upload to S3 static hosting
-  data/                       # Downloaded XML + generated dashboard (gitignored)
+  data/                       # Downloaded XML + generated dashboards (gitignored)
   dist/lambda/                # Built Lambda zip files (gitignored)
 ```
 
-## Teaching Approach
-
-- Explain the **"why"** before the "how" for every AWS service and tool
-- One technology group at a time -- discuss, then build
-- Use real SWGAide data wherever possible
-- The user is comfortable with TypeScript but new to AWS, IaC, and Docker Compose authoring
-
 ## Key npm Scripts
 
+### Infrastructure
 | Script | What it does |
 |--------|-------------|
-| `npm run ingest` | Full pipeline: download -> diff -> DynamoDB -> events -> SNS -> S3 |
-| `npm run diff` | Show spawn/despawn diff without modifying anything |
-| `npm run query -- --planet Tatooine` | Query resources by planet/class/stat |
-| `npm run events` | Show today's spawn/despawn events |
-| `npm run process:history` | Drain history SQS queue -> resource-history table |
-| `npm run process:alerts` | Drain alerts SQS queue -> check rules -> fire alerts |
-| `npm run alerts:add -- --name X --class Y` | Add an alert rule |
-| `npm run alerts:list` | Show all alert rules |
-| `npm run alerts:history` | Show fired alert history |
-| `npm run lambda:build` | Build + bundle + deploy Lambda functions to LocalStack |
-| `npm run dashboard` | Generate Bazaar Terminal HTML dashboard |
 | `npm run localstack:up` | Start LocalStack container |
 | `npm run localstack:reset` | Wipe all data and restart fresh |
-| `npm run api:test` | Smoke test all API Gateway endpoints |
-| `npm run tofu:init:phase4` | Initialize Phase 4 OpenTofu |
-| `npm run tofu:apply:phase4` | Apply Phase 4 infrastructure |
-| `npm run tofu:init:phase5` | Initialize Phase 5 OpenTofu |
-| `npm run tofu:apply:phase5` | Apply Phase 5 infrastructure |
-| `npm run pipeline:start` | Start a Step Functions ingestion pipeline execution |
+| `npm run lambda:build` | Build + bundle + deploy all 12 Lambda functions |
+
+### Data & Pipeline
+| Script | What it does |
+|--------|-------------|
+| `npm run ingest` | Direct pipeline: download -> diff -> DynamoDB -> events -> SNS -> S3 |
+| `npm run diff` | Show spawn/despawn diff without modifying anything |
+| `npm run pipeline:start` | Start a Step Functions pipeline execution |
 | `npm run pipeline:status` | Check pipeline execution status (last 5 runs) |
-| `npm run tofu:init:phase6` | Initialize Phase 6 OpenTofu |
-| `npm run tofu:apply:phase6` | Apply Phase 6 infrastructure |
+
+### Querying
+| Script | What it does |
+|--------|-------------|
+| `npm run query -- --planet Tatooine` | Query resources by planet/class/stat |
+| `npm run events` | Show today's spawn/despawn events |
+| `npm run api:test` | Smoke test all 15 API Gateway endpoints |
+
+### Alerts
+| Script | What it does |
+|--------|-------------|
+| `npm run alerts:add -- --name X --class Y` | Add an alert rule |
+| `npm run alerts:list` | Show all alert rules |
+| `npm run alerts:remove -- --id r_xxx` | Remove an alert rule |
+| `npm run alerts:history` | Show fired alert history |
+
+### Dashboards & Frontend
+| Script | What it does |
+|--------|-------------|
+| `npm run dashboard` | Generate Bazaar Terminal HTML dashboard |
 | `npm run dashboard:ops` | Generate operations HTML dashboard |
 | `npm run frontend:dev` | Start React dev server (http://localhost:3000) with API proxy |
 | `npm run frontend:build` | Build React app for production |
 | `npm run frontend:deploy` | Build + upload React app to S3 static hosting |
 
-## Known Future Additions
+## User Context
 
-- **Resource class hierarchy** -- SWG has a deep tree (e.g., Mineral > Metal > Non-Ferrous Metal > Aluminum > Link-Steel Aluminum). Currently not in our data model. Needed for Phase 3 schematic matching. Plan: static TypeScript mapping file.
-- **Schematics data** -- Crafting recipes from SWGAide's `schematics_unity.xml.gz`. Deferred until Phase 3.
+- Semi-active SWG Legends player
+- Also plays EVE Online and World of Tanks -- may build similar projects for those later
+- Now has hands-on experience with all major AWS services in this project
+- Comfortable with TypeScript, React, AWS SDK v3, OpenTofu, Docker Compose
+- Understands the "why" behind each service and when to use what
+- Prefers learning the widely-used, general-purpose tools first; niche things later
+- Asks good questions about architecture tradeoffs -- explain reasoning, not just instructions
+
+## Possible Extensions
+
+- **Schematics data** -- Parse SWGAide's `schematics_unity.xml.gz`, add `GET /schematics/{name}/best-resources` API endpoint. Requires resource class hierarchy first.
+- **Resource class hierarchy** -- Static TypeScript mapping of SWG's class tree. Would make alert matching smarter.
+- **Frontend improvements** -- Resource detail view, real-time pipeline status, WebSocket live events, dark/light theme toggle.
+- **Cognito (authentication)** -- User auth for per-user alert rules.
+- **Deploy to real AWS** -- OpenTofu definitions are production-correct. Deploying to a real account would make CloudWatch, EventBridge, and IAM fully functional.
+- **CI/CD pipeline** -- GitHub Actions for `tofu plan`, `lambda:build`, `api:test`, `frontend:deploy`.
 
 ## Known LocalStack Limitations
 
@@ -222,7 +239,9 @@ swg-legends-localstack-infra/
 - **MOCK integration responses** (for OPTIONS/CORS preflight) fail on LocalStack. CORS is handled by Lambda response headers instead (`Access-Control-Allow-Origin: *` on every response).
 - **Lambda containers behind corporate proxy** can't reach external HTTPS URLs due to self-signed cert interception. The `pipeline-download` Lambda uses `NODE_TLS_REJECT_UNAUTHORIZED=0` as a LocalStack-only workaround.
 - **Step Functions Parallel state** output replaces the state data with an array. Use `ResultPath` to merge parallel output into existing state data, preserving fields needed by later steps.
+- **CloudWatch metrics** may not be populated by LocalStack services. Dashboard and alarm definitions are production-correct but may show no data locally.
+- **EventBridge scheduled rules** may not fire reliably in LocalStack. The rules are created and can be verified, but automatic triggering may not work.
 
 ## Full Details
 
-See `plan/handoff.md` for the complete backstory, all decisions made, data source details, and the full phase plan.
+See `plan/handoff.md` for the complete backstory, all decisions made, data source details, phase-by-phase outcomes, and possible extensions.
