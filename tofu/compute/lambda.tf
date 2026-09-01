@@ -48,9 +48,10 @@ resource "aws_lambda_function" "alert_evaluator" {
       # "localhost" refers to the Lambda container itself, not LocalStack.
       # We use "host.docker.internal" which Docker resolves to the host
       # machine, where LocalStack's port 4566 is exposed.
-      LOCALSTACK_ENDPOINT = "http://host.docker.internal:4566"
-      AWS_REGION_CUSTOM   = var.aws_region
-      ALERT_RULES_TABLE   = "alert-rules"
+      LOCALSTACK_ENDPOINT    = "http://host.docker.internal:4566"
+      AWS_REGION_CUSTOM      = var.aws_region
+      ALERT_RULES_TABLE      = "alert-rules"
+      RESOURCE_CLASSES_TABLE  = "resource-classes"
     }
   }
 

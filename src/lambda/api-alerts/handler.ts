@@ -1,35 +1,33 @@
 /**
- * Lambda handler: API — Alerts
+ * Lambda handler: API -- Alerts
  *
  * Serves four endpoints via API Gateway REST API (v1):
  *
- *   GET    /alerts/rules            — list all alert rules
- *   POST   /alerts/rules            — create a new alert rule
- *   DELETE /alerts/rules/{ruleId}   — delete an alert rule
- *   GET    /alerts/history          — list fired alert history
+ *   GET    /alerts/rules            -- list all alert rules
+ *   POST   /alerts/rules            -- create a new alert rule
+ *   DELETE /alerts/rules/{ruleId}   -- delete an alert rule
+ *   GET    /alerts/history          -- list fired alert history
  *
- * All four operations work on the same DynamoDB table (alert-rules)
- * using the single-table pattern:
- *   pk="RULE"  — alert rule definitions
- *   pk="FIRED" — fired alert records
+ * POST /alerts/rules accepts:
+ *   {
+ *     "name": "Endgame Metal",
+ *     "classPattern": "Metal",                    // hierarchy-aware
+ *     "statThresholds": { "oq": 800, "sr": 400 }, // optional, AND logic
+ *     "planets": ["Tatooine", "Naboo"]             // optional, OR logic
+ *   }
  *
- * The handler routes requests based on the HTTP method and path.
- * This is a common pattern: one Lambda per domain area, with internal
- * routing. It avoids having a separate Lambda for every endpoint while
- * keeping the handler focused on a single domain (alerts).
- *
- * POST /alerts/rules expects a JSON body:
+ * Legacy format (still accepted, normalized to statThresholds):
  *   {
  *     "name": "Good Copper",
  *     "classPattern": "Copper",
- *     "stat": "oq",           // optional
- *     "minValue": 800          // optional, requires stat
+ *     "stat": "oq",
+ *     "minValue": 800
  *   }
  *
  * Environment variables (set in OpenTofu):
- *   LOCALSTACK_ENDPOINT  — LocalStack URL (for DynamoDB client)
- *   AWS_REGION_CUSTOM    — AWS region
- *   ALERT_RULES_TABLE    — DynamoDB table name for alert rules
+ *   LOCALSTACK_ENDPOINT  -- LocalStack URL (for DynamoDB client)
+ *   AWS_REGION_CUSTOM    -- AWS region
+ *   ALERT_RULES_TABLE    -- DynamoDB table name for alert rules
  */
 
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
@@ -60,6 +58,9 @@ interface APIGatewayProxyResult {
 interface CreateRuleBody {
   name?: string;
   classPattern?: string;
+  statThresholds?: Record<string, number>;
+  planets?: string[];
+  // Legacy format (normalized to statThresholds)
   stat?: string;
   minValue?: number;
 }
@@ -96,6 +97,28 @@ function jsonResponse(statusCode: number, body: unknown): APIGatewayProxyResult 
   };
 }
 
+/**
+ * Normalize a rule item from DynamoDB to the new response format.
+ * Converts legacy stat/minValue to statThresholds, ensures planets is an array.
+ */
+function normalizeRule(item: Record<string, unknown>) {
+  // Normalize stat thresholds
+  let statThresholds = item.statThresholds as Record<string, number> | undefined;
+  if (!statThresholds && item.stat && item.minValue !== undefined) {
+    statThresholds = { [item.stat as string]: item.minValue as number };
+  }
+
+  return {
+    ruleId: item.sk,
+    name: item.name,
+    classPattern: item.classPattern,
+    statThresholds: statThresholds ?? {},
+    planets: (item.planets as string[]) ?? [],
+    enabled: item.enabled,
+    createdAt: item.createdAt,
+  };
+}
+
 // ─── Route handlers ──────────────────────────────────────────────────
 
 async function listRules(): Promise<APIGatewayProxyResult> {
@@ -107,16 +130,7 @@ async function listRules(): Promise<APIGatewayProxyResult> {
     })
   );
 
-  const rules = (result.Items ?? []).map((item) => ({
-    ruleId: item.sk,
-    name: item.name,
-    classPattern: item.classPattern,
-    stat: item.stat,
-    minValue: item.minValue,
-    enabled: item.enabled,
-    createdAt: item.createdAt,
-  }));
-
+  const rules = (result.Items ?? []).map(normalizeRule);
   return jsonResponse(200, { count: rules.length, rules });
 }
 
@@ -132,31 +146,50 @@ async function createRule(body: string | null): Promise<APIGatewayProxyResult> {
     return jsonResponse(400, { error: "Invalid JSON in request body" });
   }
 
-  const { name, classPattern, stat, minValue } = parsed;
+  const { name, classPattern } = parsed;
 
   // Validate required fields
   if (!name || !classPattern) {
     return jsonResponse(400, {
       error: "Missing required fields: name, classPattern",
       example: {
-        name: "Good Copper",
-        classPattern: "Copper",
-        stat: "oq",
-        minValue: 800,
+        name: "Endgame Metal",
+        classPattern: "Metal",
+        statThresholds: { oq: 800, sr: 400 },
+        planets: ["Tatooine"],
       },
     });
   }
 
-  // Validate stat
-  if (stat && !VALID_STATS.includes(stat)) {
-    return jsonResponse(400, {
-      error: `Invalid stat: "${stat}". Valid stats: ${VALID_STATS.join(", ")}`,
-    });
+  // Normalize stat thresholds: accept new format or legacy format
+  let statThresholds: Record<string, number> = {};
+
+  if (parsed.statThresholds && typeof parsed.statThresholds === "object") {
+    // New format: { "oq": 800, "sr": 400 }
+    statThresholds = parsed.statThresholds;
+  } else if (parsed.stat && parsed.minValue !== undefined) {
+    // Legacy format: stat + minValue -> convert
+    statThresholds = { [parsed.stat]: parsed.minValue };
   }
 
-  // Validate minValue requires stat
-  if (minValue !== undefined && !stat) {
-    return jsonResponse(400, { error: "minValue requires stat" });
+  // Validate all stat keys in thresholds
+  for (const key of Object.keys(statThresholds)) {
+    if (!VALID_STATS.includes(key)) {
+      return jsonResponse(400, {
+        error: `Invalid stat in statThresholds: "${key}". Valid stats: ${VALID_STATS.join(", ")}`,
+      });
+    }
+    if (typeof statThresholds[key] !== "number" || statThresholds[key] < 0) {
+      return jsonResponse(400, {
+        error: `Invalid threshold for ${key}: must be a non-negative number`,
+      });
+    }
+  }
+
+  // Validate planets
+  const planets = parsed.planets ?? [];
+  if (!Array.isArray(planets)) {
+    return jsonResponse(400, { error: "planets must be an array of strings" });
   }
 
   const ruleId = `r_${Date.now()}`;
@@ -171,8 +204,13 @@ async function createRule(body: string | null): Promise<APIGatewayProxyResult> {
     createdAt: now,
   };
 
-  if (stat) item.stat = stat;
-  if (minValue !== undefined) item.minValue = minValue;
+  // Store in new format only
+  if (Object.keys(statThresholds).length > 0) {
+    item.statThresholds = statThresholds;
+  }
+  if (planets.length > 0) {
+    item.planets = planets;
+  }
 
   await docClient.send(new PutCommand({ TableName: tableName, Item: item }));
 
@@ -182,8 +220,8 @@ async function createRule(body: string | null): Promise<APIGatewayProxyResult> {
       ruleId,
       name,
       classPattern,
-      stat: stat || null,
-      minValue: minValue ?? null,
+      statThresholds,
+      planets,
       enabled: true,
       createdAt: now,
     },
@@ -191,9 +229,6 @@ async function createRule(body: string | null): Promise<APIGatewayProxyResult> {
 }
 
 async function deleteRule(ruleId: string): Promise<APIGatewayProxyResult> {
-  // DynamoDB DeleteItem is idempotent — it succeeds even if the item
-  // doesn't exist. We use a condition expression to detect that case
-  // and return a 404 instead of a silent success.
   try {
     await docClient.send(
       new DeleteCommand({

@@ -7,23 +7,32 @@
  *
  * For each spawned resource:
  * 1. Fetch all enabled alert rules from DynamoDB
- * 2. Check if the resource matches any rule
+ * 2. Check if the resource matches any rule (hierarchy-aware class
+ *    matching, multiple stat thresholds, planet filter)
  * 3. If matched, write a FIRED alert to the alert-rules table
  *
- * Key difference from the manual consumer (process-alerts.ts):
- * - No SQS polling -- Lambda receives the messages directly
- * - No SQS delete -- Lambda auto-deletes on successful return
- * - If the handler throws, Lambda retries (message goes back to queue)
- * - After 3 failures, message goes to DLQ
+ * Matching logic:
+ * - classPattern: hierarchy-aware. "Metal" matches all metal subtypes.
+ *   Falls back to substring matching if the class isn't in the hierarchy.
+ * - statThresholds: map of stat -> minValue. ALL must be met (AND).
+ *   Legacy rules with single stat/minValue are normalized.
+ * - planets: if set, resource must spawn on at least one listed planet (OR).
+ *   If empty/absent, any planet matches.
  *
  * Environment variables (set in OpenTofu):
  * - LOCALSTACK_ENDPOINT: LocalStack URL (for DynamoDB client)
  * - AWS_REGION_CUSTOM: AWS region
  * - ALERT_RULES_TABLE: DynamoDB table name for alert rules
+ * - RESOURCE_CLASSES_TABLE: DynamoDB table name for class hierarchy
  */
 
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, QueryCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
+import {
+  DynamoDBDocumentClient,
+  QueryCommand,
+  PutCommand,
+  ScanCommand,
+} from "@aws-sdk/lib-dynamodb";
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -53,28 +62,77 @@ interface AlertRule {
   sk: string;
   name: string;
   classPattern: string;
+  // New format
+  statThresholds?: Record<string, number>;
+  planets?: string[];
+  // Legacy format (normalized at read time)
   stat?: string;
   minValue?: number;
   enabled: boolean;
+}
+
+interface ClassInfo {
+  treePath: string;
+  className: string;
+  depth: number;
 }
 
 // ─── Config ──────────────────────────────────────────────────────────
 
 const endpoint = process.env.LOCALSTACK_ENDPOINT || "http://localhost:4566";
 const region = process.env.AWS_REGION_CUSTOM || process.env.AWS_REGION || "us-east-1";
-const tableName = process.env.ALERT_RULES_TABLE || "alert-rules";
+const alertsTableName = process.env.ALERT_RULES_TABLE || "alert-rules";
+const classesTableName = process.env.RESOURCE_CLASSES_TABLE || "resource-classes";
 
 const ddbClient = new DynamoDBClient({ endpoint, region });
 const docClient = DynamoDBDocumentClient.from(ddbClient, {
   marshallOptions: { removeUndefinedValues: true },
 });
 
+// ─── Classification cache ────────────────────────────────────────────
+// Loaded once on cold start, reused across invocations.
+
+let classCache: Map<string, ClassInfo> | null = null;
+
+async function loadClassCache(): Promise<Map<string, ClassInfo>> {
+  if (classCache) return classCache;
+
+  console.log(`Loading classification cache from ${classesTableName}...`);
+  const cache = new Map<string, ClassInfo>();
+  let lastKey: Record<string, unknown> | undefined;
+
+  do {
+    const result = await docClient.send(
+      new ScanCommand({
+        TableName: classesTableName,
+        ProjectionExpression: "className, treePath, #d",
+        ExpressionAttributeNames: { "#d": "depth" },
+        ExclusiveStartKey: lastKey,
+      })
+    );
+
+    for (const item of result.Items ?? []) {
+      cache.set(item.className as string, {
+        treePath: item.treePath as string,
+        className: item.className as string,
+        depth: item.depth as number,
+      });
+    }
+
+    lastKey = result.LastEvaluatedKey as Record<string, unknown> | undefined;
+  } while (lastKey);
+
+  console.log(`Classification cache loaded: ${cache.size} classes`);
+  classCache = cache;
+  return cache;
+}
+
 // ─── Business logic ──────────────────────────────────────────────────
 
 async function fetchAlertRules(): Promise<AlertRule[]> {
   const result = await docClient.send(
     new QueryCommand({
-      TableName: tableName,
+      TableName: alertsTableName,
       KeyConditionExpression: "pk = :pk",
       ExpressionAttributeValues: { ":pk": "RULE" },
     })
@@ -82,16 +140,55 @@ async function fetchAlertRules(): Promise<AlertRule[]> {
   return ((result.Items ?? []) as AlertRule[]).filter((r) => r.enabled);
 }
 
-function matchesRule(resource: SpawnMessage, rule: AlertRule): boolean {
+/**
+ * Check if a spawned resource matches an alert rule.
+ *
+ * 1. Class check: hierarchy-aware (resource must be a descendant of
+ *    or equal to the rule's classPattern). Falls back to substring
+ *    matching if the class isn't in the hierarchy.
+ * 2. Stat check: all statThresholds must be met (AND logic).
+ * 3. Planet check: if rule.planets is set, resource must be on at
+ *    least one listed planet (OR logic).
+ */
+function matchesRule(
+  resource: SpawnMessage,
+  rule: AlertRule,
+  cache: Map<string, ClassInfo>
+): boolean {
+  // 1. Class check (hierarchy-aware)
   if (rule.classPattern) {
-    if (!resource.resourceClass.toLowerCase().includes(rule.classPattern.toLowerCase())) {
-      return false;
+    const ruleInfo = cache.get(rule.classPattern);
+    const resourceInfo = cache.get(resource.resourceClass);
+
+    if (ruleInfo && resourceInfo) {
+      // Hierarchy match: resource's path must be or start with rule's path
+      const isExact = resourceInfo.treePath === ruleInfo.treePath;
+      const isDescendant = resourceInfo.treePath.startsWith(ruleInfo.treePath + "/");
+      if (!isExact && !isDescendant) return false;
+    } else {
+      // Fallback: substring match (for unrecognized class names)
+      if (!resource.resourceClass.toLowerCase().includes(rule.classPattern.toLowerCase())) {
+        return false;
+      }
     }
   }
-  if (rule.stat && rule.minValue !== undefined) {
-    const val = resource.stats[rule.stat];
-    if (val === undefined || val < rule.minValue) return false;
+
+  // 2. Stat thresholds (AND -- all must pass)
+  // Normalize legacy single stat/minValue to statThresholds map
+  const thresholds = rule.statThresholds ??
+    (rule.stat && rule.minValue !== undefined ? { [rule.stat]: rule.minValue } : {});
+
+  for (const [stat, minVal] of Object.entries(thresholds)) {
+    const val = resource.stats[stat];
+    if (val === undefined || val < minVal) return false;
   }
+
+  // 3. Planet filter (OR -- resource must be on at least one listed planet)
+  if (rule.planets && rule.planets.length > 0) {
+    const rulePlanets = new Set(rule.planets);
+    if (!resource.planets.some((p) => rulePlanets.has(p))) return false;
+  }
+
   return true;
 }
 
@@ -99,7 +196,7 @@ async function recordFiredAlert(resource: SpawnMessage, rule: AlertRule): Promis
   const now = new Date().toISOString();
   await docClient.send(
     new PutCommand({
-      TableName: tableName,
+      TableName: alertsTableName,
       Item: {
         pk: "FIRED",
         sk: `${now}#${rule.sk}`,
@@ -121,6 +218,9 @@ async function recordFiredAlert(resource: SpawnMessage, rule: AlertRule): Promis
 export async function handler(event: SQSEvent): Promise<void> {
   console.log(`Alert evaluator invoked with ${event.Records.length} record(s)`);
 
+  // Load classification cache (cached across invocations)
+  const cache = await loadClassCache();
+
   const rules = await fetchAlertRules();
   console.log(`Loaded ${rules.length} active alert rules`);
 
@@ -137,7 +237,7 @@ export async function handler(event: SQSEvent): Promise<void> {
       console.log(`Evaluating: ${body.resourceName} (${body.resourceClass})`);
 
       for (const rule of rules) {
-        if (matchesRule(body, rule)) {
+        if (matchesRule(body, rule, cache)) {
           await recordFiredAlert(body, rule);
           totalMatches++;
           console.log(`  ALERT FIRED: [${rule.name}] matched ${body.resourceName}`);

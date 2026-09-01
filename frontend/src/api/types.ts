@@ -74,7 +74,11 @@ export interface AlertRule {
   ruleId: string;
   name: string;
   classPattern: string;
+  statThresholds?: Record<string, number>;
+  planets?: string[];
+  /** @deprecated Use statThresholds instead */
   stat?: string;
+  /** @deprecated Use statThresholds instead */
   minValue?: number;
   enabled: boolean;
   createdAt?: string;

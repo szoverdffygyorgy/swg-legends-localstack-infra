@@ -12,6 +12,7 @@ const YELLOW = "\x1b[33m";
 const GREEN = "\x1b[32m";
 const RED = "\x1b[31m";
 const DIM = "\x1b[2m";
+const CYAN = "\x1b[36m";
 const RESET = "\x1b[0m";
 
 interface AlertRule {
@@ -19,10 +20,22 @@ interface AlertRule {
   sk: string;
   name: string;
   classPattern: string;
+  statThresholds?: Record<string, number>;
+  planets?: string[];
+  // Legacy format
   stat?: string;
   minValue?: number;
   enabled: boolean;
   createdAt?: string;
+}
+
+/**
+ * Normalize stat thresholds from either new or legacy format.
+ */
+function getThresholds(rule: AlertRule): Record<string, number> {
+  if (rule.statThresholds) return rule.statThresholds;
+  if (rule.stat && rule.minValue !== undefined) return { [rule.stat]: rule.minValue };
+  return {};
 }
 
 async function main(): Promise<void> {
@@ -45,52 +58,36 @@ async function main(): Promise<void> {
       `  ${DIM}No alert rules defined. Add one with:${RESET}`
     );
     console.log(
-      `  npm run alerts:add -- --name "Good Copper" --class Copper --stat oq --min 900\n`
+      `  npm run alerts:add -- --name "Good Copper" --class Copper --stat oq:800\n`
     );
     return;
   }
 
-  // Column widths
-  const idWidth = Math.max(6, ...rules.map((r) => r.sk.length));
-  const nameWidth = Math.max(8, ...rules.map((r) => r.name.length));
-  const classWidth = Math.max(9, ...rules.map((r) => r.classPattern.length));
-
-  // Header
-  const header = [
-    "ID".padEnd(idWidth),
-    "NAME".padEnd(nameWidth),
-    "CLASS".padEnd(classWidth),
-    "STAT",
-    "  MIN",
-    "  ENABLED",
-  ].join("  ");
-
-  console.log(`  ${DIM}${header}${RESET}`);
-  console.log(`  ${DIM}${"-".repeat(header.length)}${RESET}`);
-
   for (const rule of rules) {
     const enabledStr = rule.enabled
-      ? `${GREEN}yes${RESET}`
-      : `${RED}no${RESET}`;
-    const statStr = rule.stat ? rule.stat.toUpperCase().padEnd(4) : `${DIM}  - ${RESET}`;
-    const minStr =
-      rule.minValue !== undefined
-        ? String(rule.minValue).padStart(5)
-        : `${DIM}    -${RESET}`;
+      ? `${GREEN}enabled${RESET}`
+      : `${RED}disabled${RESET}`;
 
-    const row = [
-      `${DIM}${rule.sk.padEnd(idWidth)}${RESET}`,
-      `${YELLOW}${rule.name.padEnd(nameWidth)}${RESET}`,
-      rule.classPattern.padEnd(classWidth),
-      statStr,
-      minStr,
-      `  ${enabledStr}`,
-    ].join("  ");
+    const thresholds = getThresholds(rule);
+    const statStr = Object.keys(thresholds).length > 0
+      ? Object.entries(thresholds)
+          .map(([k, v]) => `${CYAN}${k.toUpperCase()}>=${v}${RESET}`)
+          .join(", ")
+      : `${DIM}none${RESET}`;
 
-    console.log(`  ${row}`);
+    const planets = rule.planets ?? [];
+    const planetStr = planets.length > 0
+      ? planets.join(", ")
+      : `${DIM}all${RESET}`;
+
+    console.log(`  ${YELLOW}${rule.name}${RESET}  ${DIM}(${rule.sk})${RESET}  ${enabledStr}`);
+    console.log(`    Class:   ${rule.classPattern} (hierarchy-aware)`);
+    console.log(`    Stats:   ${statStr}`);
+    console.log(`    Planets: ${planetStr}`);
+    console.log();
   }
 
-  console.log(`\n  ${rules.length} rule(s)\n`);
+  console.log(`  ${rules.length} rule(s)\n`);
 }
 
 main().catch((err) => {
