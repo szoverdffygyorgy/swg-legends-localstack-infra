@@ -38,6 +38,22 @@
   gap: 4px;
 }
 
+.filter-group--alert {
+  min-width: 0;
+  flex-shrink: 1;
+}
+
+.filter-group--alert select {
+  min-width: 180px;
+  max-width: 360px;
+  text-overflow: ellipsis;
+}
+
+.filter-group--alert select.alert-active {
+  border-color: var(--accent-gold-dim);
+  color: var(--accent-gold);
+}
+
 .filter-group label {
   color: var(--text-secondary);
   font-size: 0.7rem;

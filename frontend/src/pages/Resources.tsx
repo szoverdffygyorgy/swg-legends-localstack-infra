@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { getResources, getClassTree, type ResourceFilters } from "../api/client";
-import type { ResourceItem, ClassTreeNode, StatKey } from "../api/types";
+import { getResources, getClassTree, getAlertRules, type ResourceFilters } from "../api/client";
+import type { ResourceItem, ClassTreeNode, AlertRule, StatKey } from "../api/types";
 import { STAT_KEYS } from "../api/types";
 import ClassTreePicker from "../components/ClassTreePicker";
 import LoadingSpinner from "../components/LoadingSpinner";
@@ -11,10 +11,6 @@ type SortDir = "asc" | "desc";
 
 // ─── Stat quality helpers ────────────────────────────────────────────
 
-/**
- * Calculate stat quality as a percentage of the class's stat cap range.
- * Returns 0-100, or null if caps are unavailable.
- */
 function statQuality(
   value: number | undefined,
   caps: [number, number] | undefined
@@ -25,12 +21,8 @@ function statQuality(
   return Math.round(((value - min) / (max - min)) * 100);
 }
 
-/**
- * CSS class for stat quality tier (applied to the percentage).
- * Top: >= 95%, High: 90-94%, Fair: 80-89%, Mid: 50-79%, Low: < 50%
- */
 function qualityClass(quality: number | null): string {
-  if (quality === null) return "qual-mid"; // fallback if no caps
+  if (quality === null) return "qual-mid";
   if (quality >= 95) return "qual-top";
   if (quality >= 90) return "qual-high";
   if (quality >= 80) return "qual-fair";
@@ -38,10 +30,6 @@ function qualityClass(quality: number | null): string {
   return "qual-low";
 }
 
-/**
- * CSS class for raw stat value (applied to the number).
- * 950-1000: top, 900-949: high, 800-899: fair, 500-799: mid, 0-499: low
- */
 function rawValueClass(val: number): string {
   if (val >= 950) return "raw-top";
   if (val >= 900) return "raw-high";
@@ -50,11 +38,56 @@ function rawValueClass(val: number): string {
   return "raw-low";
 }
 
+// ─── Alert helpers ───────────────────────────────────────────────────
+
+/** Get normalized stat thresholds from an alert rule (handles legacy format). */
+function getAlertThresholds(rule: AlertRule): Record<string, number> {
+  if (rule.statThresholds && Object.keys(rule.statThresholds).length > 0) return rule.statThresholds;
+  if (rule.stat && rule.minValue !== undefined) return { [rule.stat]: rule.minValue };
+  return {};
+}
+
+/** Format an alert rule for the dropdown display. */
+function formatAlertLabel(rule: AlertRule): string {
+  const parts: string[] = [rule.name, `(${rule.classPattern}`];
+
+  const thresholds = getAlertThresholds(rule);
+  const statParts = Object.entries(thresholds).map(([k, v]) => `${k.toUpperCase()}>=${v}`);
+  if (statParts.length > 0) parts.push(`, ${statParts.join(", ")}`);
+
+  const planets = rule.planets ?? [];
+  if (planets.length > 0) parts.push(` | ${planets.join(", ")}`);
+
+  parts.push(")");
+  return parts.join("");
+}
+
+/** Check if a resource matches an alert's stat thresholds and planet filter. */
+function resourceMatchesAlert(r: ResourceItem, rule: AlertRule): boolean {
+  // Check stat thresholds (AND)
+  const thresholds = getAlertThresholds(rule);
+  for (const [stat, minVal] of Object.entries(thresholds)) {
+    const val = r[stat as StatKey];
+    if (val === undefined || val < minVal) return false;
+  }
+
+  // Check planet filter (OR)
+  const planets = rule.planets ?? [];
+  if (planets.length > 0) {
+    const resourcePlanets = r.allPlanets ? r.allPlanets.split(", ") : [r.planet];
+    const rulePlanets = new Set(planets);
+    if (!resourcePlanets.some((p) => rulePlanets.has(p))) return false;
+  }
+
+  return true;
+}
+
 // ─── Component ───────────────────────────────────────────────────────
 
 export default function Resources() {
   const [resources, setResources] = useState<ResourceItem[]>([]);
   const [classTree, setClassTree] = useState<ClassTreeNode[]>([]);
+  const [alertRules, setAlertRules] = useState<AlertRule[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -64,18 +97,24 @@ export default function Resources() {
   const [stat, setStat] = useState("");
   const [min, setMin] = useState("");
 
+  // Alert filter
+  const [selectedAlertId, setSelectedAlertId] = useState<string | null>(null);
+
   // Sort
   const [sortKey, setSortKey] = useState<string>("oq");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
-  // Load class tree on mount
+  // Load class tree and alert rules on mount
   useEffect(() => {
     getClassTree()
       .then(setClassTree)
       .catch((err) => console.warn("Failed to load class tree:", err));
+    getAlertRules()
+      .then((data) => setAlertRules(data.rules))
+      .catch((err) => console.warn("Failed to load alert rules:", err));
   }, []);
 
-  // Build stat caps lookup: className -> { statKey -> [min, max] }
+  // Build stat caps lookup
   const statCapsMap = useMemo(() => {
     const map = new Map<string, Partial<Record<StatKey, [number, number]>>>();
     for (const node of classTree) {
@@ -85,6 +124,32 @@ export default function Resources() {
     }
     return map;
   }, [classTree]);
+
+  // Resolve selected alert rule object
+  const selectedAlert = useMemo(() => {
+    if (!selectedAlertId) return null;
+    return alertRules.find((r) => r.ruleId === selectedAlertId) ?? null;
+  }, [selectedAlertId, alertRules]);
+
+  // When alert selection changes, update the class filter to match
+  const handleAlertChange = useCallback((alertId: string) => {
+    if (!alertId) {
+      setSelectedAlertId(null);
+      setClassFilter(null);
+      return;
+    }
+    const rule = alertRules.find((r) => r.ruleId === alertId);
+    if (rule) {
+      setSelectedAlertId(alertId);
+      setClassFilter(rule.classPattern);
+    }
+  }, [alertRules]);
+
+  // When class tree is clicked directly, clear the alert selection
+  const handleClassSelect = useCallback((className: string | null) => {
+    setClassFilter(className);
+    setSelectedAlertId(null); // manual class selection overrides alert
+  }, []);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -110,10 +175,18 @@ export default function Resources() {
     fetchData();
   }, [fetchData]);
 
-  // Extract unique planets for dropdown (use raw resources for full planet coverage)
+  // Pipeline: raw resources -> alert post-filter -> planet extraction -> dedup -> sort
+
+  // Step 1: Apply alert's stat thresholds and planet filter (if an alert is active)
+  const alertFiltered = useMemo(() => {
+    if (!selectedAlert) return resources;
+    return resources.filter((r) => resourceMatchesAlert(r, selectedAlert));
+  }, [resources, selectedAlert]);
+
+  // Step 2: Extract unique planets for dropdown (from the alert-filtered set)
   const planets = useMemo(() => {
     const set = new Set<string>();
-    resources.forEach((r) => {
+    alertFiltered.forEach((r) => {
       if (r.allPlanets) {
         r.allPlanets.split(", ").forEach((p) => set.add(p));
       } else {
@@ -121,23 +194,20 @@ export default function Resources() {
       }
     });
     return [...set].sort();
-  }, [resources]);
+  }, [alertFiltered]);
 
-  // Deduplicate resources by resourceId.
-  // The API returns one item per resource-planet combination (denormalized).
-  // For display, we want one row per unique resource. Each item already has
-  // allPlanets (comma-separated) so we just take the first item per resourceId.
+  // Step 3: Deduplicate by resourceId
   const deduped = useMemo(() => {
     const seen = new Map<string, ResourceItem>();
-    for (const r of resources) {
+    for (const r of alertFiltered) {
       if (!seen.has(r.resourceId)) {
         seen.set(r.resourceId, r);
       }
     }
     return [...seen.values()];
-  }, [resources]);
+  }, [alertFiltered]);
 
-  // Sort deduplicated resources
+  // Step 4: Sort
   const sorted = useMemo(() => {
     const mult = sortDir === "asc" ? 1 : -1;
     return [...deduped].sort((a, b) => {
@@ -169,11 +239,6 @@ export default function Resources() {
     return sortDir === "asc" ? " \u25B2" : " \u25BC";
   }
 
-  /**
-   * Render a stat cell with independently colored raw value and quality %.
-   * Raw value: colored by absolute thresholds (950/900/800/500).
-   * Quality %: colored by cap-relative quality (95/90/80/50).
-   */
   function renderStatCell(r: ResourceItem, statKey: StatKey) {
     const val = r[statKey];
     if (val === undefined) {
@@ -211,7 +276,7 @@ export default function Resources() {
         <ClassTreePicker
           tree={classTree}
           selected={classFilter}
-          onSelect={setClassFilter}
+          onSelect={handleClassSelect}
         />
       </aside>
 
@@ -219,6 +284,21 @@ export default function Resources() {
       <div className="resources-main">
         {/* Filter bar */}
         <div className="filter-bar">
+          <div className="filter-group filter-group--alert">
+            <label>Alert</label>
+            <select
+              value={selectedAlertId ?? ""}
+              onChange={(e) => handleAlertChange(e.target.value)}
+              className={selectedAlertId ? "alert-active" : ""}
+            >
+              <option value="">No Alert</option>
+              {alertRules.map((rule) => (
+                <option key={rule.ruleId} value={rule.ruleId}>
+                  {formatAlertLabel(rule)}
+                </option>
+              ))}
+            </select>
+          </div>
           <div className="filter-group">
             <label>Planet</label>
             <select value={planet} onChange={(e) => setPlanet(e.target.value)}>
