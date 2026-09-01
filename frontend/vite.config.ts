@@ -21,6 +21,10 @@ function getApiBaseUrl(): string {
   }
 }
 
+// LocalStack S3 endpoint for static assets (class tree JSON).
+const LOCALSTACK_S3 = "http://localhost:4566";
+const FRONTEND_BUCKET = "swg-legends-frontend";
+
 const apiBaseUrl = getApiBaseUrl();
 
 export default defineConfig({
@@ -32,6 +36,13 @@ export default defineConfig({
         target: apiBaseUrl,
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ""),
+      },
+      // Static reference data served from S3 (independent lifecycle from the app).
+      // In production (S3 hosted), this file is a sibling in the same bucket,
+      // so the relative URL /resource-class-tree.json resolves naturally.
+      "/resource-class-tree.json": {
+        target: `${LOCALSTACK_S3}/${FRONTEND_BUCKET}`,
+        changeOrigin: true,
       },
     },
   },

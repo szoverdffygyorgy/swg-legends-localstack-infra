@@ -1,3 +1,23 @@
+/* ─── Page layout: sidebar + main ─────────────────────── */
+
+.resources-page {
+  display: flex;
+  gap: 16px;
+  height: calc(100vh - 120px); /* account for header + footer */
+}
+
+.resources-sidebar {
+  flex-shrink: 0;
+}
+
+.resources-main {
+  flex: 1;
+  min-width: 0; /* allow flex child to shrink below content size */
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
 /* ─── Filter bar ──────────────────────────────────────── */
 
 .filter-bar {
@@ -9,7 +29,7 @@
   background: var(--bg-panel);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  margin-bottom: 16px;
+  flex-shrink: 0;
 }
 
 .filter-group {
@@ -50,10 +70,6 @@
   background-position: right 10px center;
 }
 
-.filter-bar input[type="text"] {
-  min-width: 180px;
-}
-
 .filter-bar input[type="number"] {
   width: 80px;
 }
@@ -81,13 +97,49 @@
   font-size: 1rem;
 }
 
+/* ─── Stat color legend ───────────────────────────────── */
+
+.stat-legend {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 16px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-family: "Share Tech Mono", monospace;
+  font-size: 0.7rem;
+  flex-shrink: 0;
+}
+
+.legend-section {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.legend-label {
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-size: 0.6rem;
+  margin-right: 2px;
+}
+
+.legend-divider {
+  width: 1px;
+  height: 14px;
+  background: var(--border-light);
+}
+
 /* ─── Table ──────────────────────────────────────────── */
 
 .table-wrapper {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  overflow-x: auto;
+  overflow: auto;
   background: var(--bg-panel);
+  flex: 1;
 }
 
 .data-table {
@@ -123,7 +175,7 @@
 
 .data-table thead th.stat-header {
   text-align: right;
-  min-width: 48px;
+  min-width: 72px;
 }
 
 .data-table tbody tr {
@@ -153,9 +205,27 @@
   color: var(--text-secondary);
 }
 
+.cell-category {
+  color: var(--text-dim);
+  font-size: 0.8rem;
+}
+
+.category-label {
+  color: var(--text-secondary);
+}
+
+.group-separator {
+  color: var(--text-dim);
+  margin: 0 2px;
+}
+
+.group-label {
+  color: var(--text-dim);
+}
+
 .cell-planets {
   color: var(--text-dim);
-  max-width: 180px;
+  max-width: 150px;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -166,26 +236,71 @@
   font-size: 0.8rem;
 }
 
+.stat-value {
+  /* inherits color from parent .cell-stat tier class */
+}
+
+.stat-quality {
+  font-size: 0.65rem;
+}
+
+/* ─── Raw value colors (absolute thresholds) ──────────── */
+/* Purple > Blue > Green > Yellow > Red */
+/* 950-1000: top, 900-949: high, 800-899: fair, 500-799: mid, 0-499: low */
+
+.raw-top {
+  color: var(--stat-top);
+  text-shadow: 0 0 6px rgba(176, 128, 224, 0.4);
+}
+
+.raw-high {
+  color: var(--stat-high);
+}
+
+.raw-fair {
+  color: var(--stat-fair);
+}
+
+.raw-mid {
+  color: var(--stat-mid);
+}
+
+.raw-low {
+  color: var(--stat-low);
+}
+
+/* ─── Quality % colors (cap-relative tiers) ───────────── */
+/* Purple > Blue > Green > Yellow > Red */
+/* >= 95%: top, 90-94%: high, 80-89%: fair, 50-79%: mid, < 50%: low */
+
+.qual-top {
+  color: var(--stat-top);
+  text-shadow: 0 0 6px rgba(176, 128, 224, 0.4);
+}
+
+.qual-high {
+  color: var(--stat-high);
+}
+
+.qual-fair {
+  color: var(--stat-fair);
+}
+
+.qual-mid {
+  color: var(--stat-mid);
+}
+
+.qual-low {
+  color: var(--stat-low);
+}
+
+/* ─── Empty stat ──────────────────────────────────────── */
+
 .stat-empty {
   color: var(--text-dim);
 }
 
-.stat-low {
-  color: var(--status-error);
-}
-
-.stat-mid {
-  color: var(--status-warn);
-}
-
-.stat-high {
-  color: var(--status-ok);
-}
-
-.stat-top {
-  color: var(--accent-gold);
-  text-shadow: 0 0 6px rgba(212, 168, 70, 0.3);
-}
+/* ─── Reporter ────────────────────────────────────────── */
 
 .cell-reporter {
   color: var(--text-dim);

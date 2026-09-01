@@ -120,7 +120,22 @@ async function main(): Promise<void> {
 
   console.log(`\n  Uploaded ${files.length} files to s3://${BUCKET}/`);
 
-  // Step 4: Print access URL
+  // Step 4: Upload resource class tree JSON (static reference data)
+  // This is served alongside the frontend for the class hierarchy browser.
+  const classTreePath = "src/data/resource-class-tree.json";
+  const classTreeContent = readFileSync(classTreePath);
+  await s3.send(
+    new PutObjectCommand({
+      Bucket: BUCKET,
+      Key: "resource-class-tree.json",
+      Body: classTreeContent,
+      ContentType: "application/json",
+    })
+  );
+  const classTreeSize = Math.round(classTreeContent.length / 1024);
+  console.log(`  resource-class-tree.json (${classTreeSize} KB, application/json)`);
+
+  // Step 5: Print access URL
   const url = `${LOCALSTACK_ENDPOINT}/${BUCKET}/index.html`;
   console.log(`\n  Website URL: ${url}`);
   console.log(`\n  Note: For local development, use 'npm run frontend:dev' instead.`);

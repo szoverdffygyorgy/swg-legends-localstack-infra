@@ -13,6 +13,7 @@ import type {
   AlertRulesResponse,
   CreateRuleResponse,
   AlertHistoryResponse,
+  ClassTreeNode,
 } from "./types";
 
 // In dev mode (Vite proxy), /api is proxied to LocalStack API Gateway.
@@ -104,4 +105,22 @@ export async function deleteAlertRule(ruleId: string): Promise<void> {
 
 export async function getAlertHistory(): Promise<AlertHistoryResponse> {
   return fetchJson<AlertHistoryResponse>(`${BASE}/alerts/history`);
+}
+
+// ─── Classification ──────────────────────────────────────────────────
+// Static resource class hierarchy. Served from /resource-class-tree.json
+// (Vite public/ in dev, S3 bucket in production). Fetched once and
+// cached in memory.
+
+let classTreeCache: ClassTreeNode[] | null = null;
+
+export async function getClassTree(): Promise<ClassTreeNode[]> {
+  if (classTreeCache) return classTreeCache;
+
+  const response = await fetch("/resource-class-tree.json");
+  if (!response.ok) {
+    throw new Error(`Failed to load class tree: ${response.status}`);
+  }
+  classTreeCache = (await response.json()) as ClassTreeNode[];
+  return classTreeCache;
 }

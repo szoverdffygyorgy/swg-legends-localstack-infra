@@ -34,6 +34,13 @@
   --status-info: #5599cc;
   --status-info-bg: rgba(85, 153, 204, 0.1);
 
+  /* Stat tier colors: purple > blue > green > yellow > red */
+  --stat-top: #b080e0;
+  --stat-high: #6aaad8;
+  --stat-fair: #3d9e4f;
+  --stat-mid: #c9922a;
+  --stat-low: #c94040;
+
   /* Borders */
   --border: #1e3050;
   --border-light: #2a4060;

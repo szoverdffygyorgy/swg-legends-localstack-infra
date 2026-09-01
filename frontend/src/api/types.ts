@@ -115,3 +115,19 @@ export const STAT_KEYS = [
 ] as const;
 
 export type StatKey = (typeof STAT_KEYS)[number];
+
+// ─── Resource class hierarchy ────────────────────────────────────────
+// Matches the shape of entries in resource-class-tree.json (static data).
+
+export interface ClassTreeNode {
+  nodeId: number;
+  className: string;
+  classId: string;
+  parentNodeId: number;
+  parentName: string | null;
+  parentClassId: string | null;
+  path: string;
+  depth: number;
+  isLeaf: boolean;
+  statCaps: Partial<Record<StatKey, [number, number]>>;
+}
