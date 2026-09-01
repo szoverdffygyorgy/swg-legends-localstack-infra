@@ -34,12 +34,19 @@
     "tofu:plan:phase4": "tofu -chdir=tofu/phase4 plan",
     "tofu:apply:phase4": "tofu -chdir=tofu/phase4 apply -auto-approve",
     "tofu:destroy:phase4": "tofu -chdir=tofu/phase4 destroy -auto-approve",
-    "api:test": "tsx src/api/test-api.ts"
+    "api:test": "tsx src/api/test-api.ts",
+    "tofu:init:phase5": "tofu -chdir=tofu/phase5 init",
+    "tofu:plan:phase5": "tofu -chdir=tofu/phase5 plan",
+    "tofu:apply:phase5": "tofu -chdir=tofu/phase5 apply -auto-approve",
+    "tofu:destroy:phase5": "tofu -chdir=tofu/phase5 destroy -auto-approve",
+    "pipeline:start": "tsx src/pipeline/start.ts",
+    "pipeline:status": "tsx src/pipeline/status.ts"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.0.0",
     "@aws-sdk/client-lambda": "^3.1121.0",
     "@aws-sdk/client-s3": "^3.0.0",
+    "@aws-sdk/client-sfn": "^3.1121.0",
     "@aws-sdk/client-sns": "^3.1121.0",
     "@aws-sdk/client-sqs": "^3.1121.0",
     "@aws-sdk/lib-dynamodb": "^3.0.0",

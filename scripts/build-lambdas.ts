@@ -50,6 +50,35 @@ const LAMBDAS = [
     name: "api-alerts",
     entry: "src/lambda/api-alerts/handler.ts",
   },
+  // Phase 5: Pipeline Step Functions Lambdas
+  {
+    name: "pipeline-download",
+    entry: "src/lambda/pipeline-download/handler.ts",
+  },
+  {
+    name: "pipeline-parse",
+    entry: "src/lambda/pipeline-parse/handler.ts",
+  },
+  {
+    name: "pipeline-diff",
+    entry: "src/lambda/pipeline-diff/handler.ts",
+  },
+  {
+    name: "pipeline-update-db",
+    entry: "src/lambda/pipeline-update-db/handler.ts",
+  },
+  {
+    name: "pipeline-log-events",
+    entry: "src/lambda/pipeline-log-events/handler.ts",
+  },
+  {
+    name: "pipeline-publish-sns",
+    entry: "src/lambda/pipeline-publish-sns/handler.ts",
+  },
+  {
+    name: "pipeline-archive",
+    entry: "src/lambda/pipeline-archive/handler.ts",
+  },
 ];
 
 const BUILD_DIR = "dist/lambda";

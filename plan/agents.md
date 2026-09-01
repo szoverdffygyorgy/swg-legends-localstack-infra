@@ -13,7 +13,7 @@ All AWS services run locally via **LocalStack** (Docker). Zero cloud costs. The 
 - **Phase 2: Messaging (SQS + SNS)** -- COMPLETE
 - **Phase 3: Compute (Lambda)** -- COMPLETE
 - **Phase 4: API Layer (API Gateway)** -- COMPLETE
-- Phase 5: Orchestration (Step Functions) -- planned
+- **Phase 5: Orchestration (Step Functions)** -- COMPLETE
 - Phase 6: Events & Monitoring (EventBridge + CloudWatch) -- planned
 
 ## Key Conventions
@@ -71,6 +71,12 @@ swg-legends-localstack-infra/
       lambda.tf               # api-get-resources + api-get-events + api-alerts Lambdas
       api-gateway.tf          # REST API, resources, methods, integrations, deployment, stage
       outputs.tf              # API base URL + example curl commands
+    phase5/
+      main.tf                 # Phase 5 provider config
+      iam.tf                  # Pipeline Lambda + Step Functions execution roles
+      lambda.tf               # 7 pipeline Lambda functions
+      step-functions.tf       # State machine definition (ASL)
+      outputs.tf              # State machine ARN + start command
   src/
     config.ts                 # Shared AWS client factories + constants
     types.ts                  # SWGResource, ResourceItem, DiffResult, EventLogItem types
@@ -108,8 +114,25 @@ swg-legends-localstack-infra/
         handler.ts            # Lambda: GET /events
       api-alerts/
         handler.ts            # Lambda: /alerts/rules CRUD + /alerts/history
+      pipeline-download/
+        handler.ts            # Lambda: download SWGAide XML, upload to S3
+      pipeline-parse/
+        handler.ts            # Lambda: parse XML, write JSON to S3
+      pipeline-diff/
+        handler.ts            # Lambda: diff parsed data against DynamoDB
+      pipeline-update-db/
+        handler.ts            # Lambda: add spawned / remove despawned
+      pipeline-log-events/
+        handler.ts            # Lambda: write events to event-log table
+      pipeline-publish-sns/
+        handler.ts            # Lambda: publish spawn/despawn to SNS
+      pipeline-archive/
+        handler.ts            # Lambda: archive XML to permanent S3 path
     api/
       test-api.ts             # Smoke test for all API endpoints
+    pipeline/
+      start.ts                # Start a Step Functions pipeline execution
+      status.ts               # Check pipeline execution status
   scripts/
     build-lambdas.ts          # esbuild bundle + zip + deploy Lambdas to LocalStack
   data/                       # Downloaded XML + generated dashboard (gitignored)
@@ -143,6 +166,10 @@ swg-legends-localstack-infra/
 | `npm run api:test` | Smoke test all API Gateway endpoints |
 | `npm run tofu:init:phase4` | Initialize Phase 4 OpenTofu |
 | `npm run tofu:apply:phase4` | Apply Phase 4 infrastructure |
+| `npm run tofu:init:phase5` | Initialize Phase 5 OpenTofu |
+| `npm run tofu:apply:phase5` | Apply Phase 5 infrastructure |
+| `npm run pipeline:start` | Start a Step Functions ingestion pipeline execution |
+| `npm run pipeline:status` | Check pipeline execution status (last 5 runs) |
 
 ## Known Future Additions
 
@@ -153,6 +180,8 @@ swg-legends-localstack-infra/
 
 - **API Gateway v2 (HTTP API)** requires a paid LocalStack license. Phase 4 uses REST API v1 (`aws_api_gateway_*`), which is available on the free Hobby tier.
 - **MOCK integration responses** (for OPTIONS/CORS preflight) fail on LocalStack. CORS is handled by Lambda response headers instead (`Access-Control-Allow-Origin: *` on every response).
+- **Lambda containers behind corporate proxy** can't reach external HTTPS URLs due to self-signed cert interception. The `pipeline-download` Lambda uses `NODE_TLS_REJECT_UNAUTHORIZED=0` as a LocalStack-only workaround.
+- **Step Functions Parallel state** output replaces the state data with an array. Use `ResultPath` to merge parallel output into existing state data, preserving fields needed by later steps.
 
 ## Full Details
 
