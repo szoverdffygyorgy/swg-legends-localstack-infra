@@ -8,7 +8,7 @@ All AWS services run locally via **LocalStack** (Docker). Zero cloud costs. The 
 
 ## Current Status
 
-All modules complete. The system is fully operational.
+All modules complete, plus schematics pipeline. The system is fully operational.
 
 - **Foundation** -- COMPLETE
 - **Storage (S3 + DynamoDB)** -- COMPLETE
@@ -18,7 +18,8 @@ All modules complete. The system is fully operational.
 - **Orchestration (Step Functions)** -- COMPLETE
 - **Monitoring (EventBridge + CloudWatch)** -- COMPLETE
 - **Classification (Resource Class Hierarchy)** -- COMPLETE (816-node tree, DynamoDB table, backfilled)
-- **React Frontend** -- COMPLETE (Vite + React 19 + React Router 7, 6 pages)
+- **Schematics** -- COMPLETE (3,673 schematics, DynamoDB single-table, API endpoints, Resource Profile integration)
+- **React Frontend** -- COMPLETE (Vite + React 19 + React Router 7 + TanStack Query, 6 pages)
 
 ## Key Conventions
 
@@ -35,11 +36,13 @@ All modules complete. The system is fully operational.
 | Data source | swgaide.com XML exports, SWG Legends server ID 138 |
 | LocalStack auth | Requires `LOCALSTACK_AUTH_TOKEN` in `.env` (free Hobby tier) |
 | Corporate proxy | Ion Group HTTPS interception; combined CA bundle mounted in Docker |
-| Frontend | React 19 + Vite 6 + React Router 7, in `frontend/` directory (separate npm project) |
+| Frontend | React 19 + Vite 6 + React Router 7 + TanStack Query, in `frontend/` directory (separate npm project) |
 | Frontend theme | SWG NGE in-game UI palette: dark navy, pale blue text, warm gold accents |
-| Lambda build | esbuild bundle -> zip -> deploy via `npm run lambda:build` (16 functions total) |
+| Lambda build | esbuild bundle -> zip -> deploy via `npm run lambda:build` (17 functions total) |
 | Resource classification | 816-node class tree scraped from SWGAide, stored in DynamoDB + static JSON in S3 |
 | Alert matching | Hierarchy-aware class matching, `statThresholds` map (AND), `planets` array (OR) |
+| Schematics | 3,673 schematics from SWGAide, stored in DynamoDB (single-table: SCHEM# metadata + CLASS# ingredient index) |
+| SWGAide class mapping | 815-entry abbreviation -> className mapping in `src/data/swgaide-class-map.json` |
 
 ## Quick Start from Scratch
 
@@ -57,33 +60,40 @@ tofu -chdir=tofu/api init && tofu -chdir=tofu/api apply -auto-approve
 tofu -chdir=tofu/orchestration init && tofu -chdir=tofu/orchestration apply -auto-approve
 tofu -chdir=tofu/monitoring init && tofu -chdir=tofu/monitoring apply -auto-approve
 tofu -chdir=tofu/classification init && tofu -chdir=tofu/classification apply -auto-approve
+tofu -chdir=tofu/schematics init && tofu -chdir=tofu/schematics apply -auto-approve
 tofu -chdir=tofu/frontend init && tofu -chdir=tofu/frontend apply -auto-approve
 
 # 3. Seed the resource class hierarchy (816 nodes -> DynamoDB)
 npm run seed:classes
 
-# 4. Build and deploy all 16 Lambda functions
+# 4. Seed schematics data (3,673 schematics + ingredient index -> DynamoDB)
+npm run schematics:seed
+
+# 5. Build and deploy all 17 Lambda functions
 npm run lambda:build
 
-# 5. Ingest data (first run = full load, subsequent = diff-based)
+# 5. Build and deploy all 17 Lambda functions
+npm run lambda:build
+
+# 6. Ingest data (first run = full load, subsequent = diff-based)
 #    Ingestion enriches resources with classPath, classCategory, classGroup
 npm run ingest
 
-# 6. Upload class tree JSON to S3 (frontend loads it at runtime)
+# 7. Upload class tree JSON to S3 (frontend loads it at runtime)
 #    The deploy-frontend script handles this automatically
 npm run frontend:deploy
 
-# 7. Backfill history items with classification data (if history table has existing data)
+# 8. Backfill history items with classification data (if history table has existing data)
 npm run backfill:history
 
-# 8. Add alert rules (hierarchy-aware, multi-threshold)
+# 9. Add alert rules (hierarchy-aware, multi-threshold)
 npm run alerts:add -- --name "Endgame Metal" --class Metal --stat oq:800 --stat sr:400 --planet Tatooine
 npm run alerts:add -- --name "Any Reactive Gas" --class "Reactive Gas"
 
-# 9. Verify API
+# 10. Verify API
 npm run api:test
 
-# 10. Start frontend
+# 11. Start frontend
 npm run frontend:dev       # Dev server at http://localhost:3000
 # OR
 npm run frontend:deploy    # Build + upload to S3 static hosting
@@ -110,25 +120,28 @@ swg-legends-localstack-infra/
     storage/                  # S3 bucket + DynamoDB tables (resources w/ by-category GSI, resource-history w/ by-category GSI)
     messaging/                # SNS topics + SQS queues + DynamoDB tables (event-log, alert-rules)
     compute/                  # Lambda functions (alert-evaluator, history-recorder) + IAM + SQS event sources
-    api/                      # API Gateway REST API (12 endpoints) + 6 API Lambdas + IAM
+    api/                      # API Gateway REST API (14 endpoints) + 7 API Lambdas + IAM
     orchestration/            # Step Functions state machine + 7 pipeline Lambdas + IAM
     monitoring/               # EventBridge rules + CloudWatch dashboard/alarm + SNS topic
     classification/           # DynamoDB table (resource-classes, 816 nodes) + GSIs (by-parent, by-path)
+    schematics/               # DynamoDB table (schematics, single-table: SCHEM# + CLASS#) + by-category GSI
     frontend/                 # S3 bucket + website hosting config
   frontend/                   # React frontend (separate npm project)
-    package.json              # Vite + React + TypeScript
+    package.json              # Vite + React + TypeScript + TanStack Query
     tsconfig.json             # Frontend TypeScript config
     vite.config.ts            # Dev server + API proxy to LocalStack
     index.html                # Vite entry point
     src/
-      main.tsx                # React root mount
+      main.tsx                # React root mount + QueryClientProvider
       App.tsx                 # Routes: /resources, /resources/:id, /history, /events, /alerts, /ops (/pipeline redirects to /ops)
       api/
         client.ts             # Typed fetch wrapper for all API endpoints
         types.ts              # Response types matching Lambda output
+        queryClient.ts        # TanStack Query client configuration (retry, staleTime, gcTime)
+        hooks.ts              # 16 custom hooks (12 queries + 3 mutations + query key factory)
       pages/
         Resources.tsx + .css  # Resource table with class tree sidebar, stat quality %, alert dropdown, clickable rows
-        ResourceProfile.tsx + .css  # Resource detail page with StatBar cap range visualization, status badge
+        ResourceProfile.tsx + .css  # Resource detail page with StatBar, status badge, "Used In Schematics" section
         History.tsx + .css    # Past resources with class tree sidebar, alert presets, name search, filter-first UX
         Events.tsx + .css     # Event feed with date picker + type filter
         Alerts.tsx + .css     # Alert rules CRUD (multi-threshold form with typeahead) + enable/disable toggle + fired history
@@ -147,10 +160,11 @@ swg-legends-localstack-infra/
         theme.css             # SWG NGE color palette (CSS custom properties)
   src/
     config.ts                 # Shared AWS client factories + constants
-    types.ts                  # SWGResource, ResourceItem, DiffResult, EventLogItem, ResourceClassNode types
+    types.ts                  # SWGResource, ResourceItem, DiffResult, EventLogItem, ResourceClassNode, Schematic types
     verify-localstack.ts      # Foundation smoke test
     data/
       resource-class-tree.json  # Static 816-node class hierarchy (served from S3 at runtime)
+      swgaide-class-map.json    # 815-entry SWGAide abbreviation -> className mapping
     ingest/
       download.ts             # Download + decompress SWGAide XML export
       parse-resources.ts      # Parse XML -> SWGResource[]
@@ -159,6 +173,9 @@ swg-legends-localstack-infra/
       log-events.ts           # Write spawn/despawn events to event-log table
       upload-to-s3.ts         # Archive raw XML to S3
       pipeline.ts             # Orchestrate full ingestion flow (direct/local version)
+      download-schematics.ts  # Download + decompress SWGAide schematics XML
+      parse-schematics.ts     # Parse schematics XML -> Schematic[] with resolved class names
+      ingest-schematics.ts    # Dry-run pipeline: download + parse + validate + summary
     messaging/
       publish-events.ts       # Publish spawn/despawn events to SNS topics
       process-history.ts      # SQS consumer: despawn events -> resource-history table
@@ -170,6 +187,7 @@ swg-legends-localstack-infra/
       history.ts              # View fired alert history
     query/
       find-resources.ts       # Query by planet/class/stat with CLI args
+      find-schematics.ts      # Query schematics by name/class/category/id
       event-log.ts            # Query spawn/despawn events by date
     export/
       generate-dashboard.ts   # Generate Bazaar Terminal HTML dashboard
@@ -183,6 +201,7 @@ swg-legends-localstack-infra/
       api-alerts/             # API: /alerts/rules CRUD + toggle + /alerts/history
       api-pipeline-status/    # API: GET /pipeline/status (last sync metadata + execution history)
       api-ops-dashboard/      # API: GET /ops/dashboard (aggregates DynamoDB, SFN, CloudWatch, SQS)
+      api-get-schematics/     # API: GET /schematics, GET /schematics/{id} (hierarchy-aware ingredient index)
       pipeline-download/      # Orchestration: download SWGAide XML, upload to S3
       pipeline-parse/         # Orchestration: parse XML, write JSON to S3
       pipeline-diff/          # Orchestration: diff parsed data against DynamoDB
@@ -196,10 +215,11 @@ swg-legends-localstack-infra/
       start.ts                # Start a Step Functions pipeline execution
       status.ts               # Check pipeline execution status
   scripts/
-    build-lambdas.ts          # esbuild bundle + zip + deploy all 16 Lambdas to LocalStack
+    build-lambdas.ts          # esbuild bundle + zip + deploy all 17 Lambdas to LocalStack
     deploy-frontend.ts        # Build React app + upload to S3 static hosting
     scrape-resource-tree.ts   # Scrape SWGAide for 816-node resource class hierarchy -> JSON
     seed-resource-classes.ts  # Load resource-class-tree.json into resource-classes DynamoDB table
+    seed-schematics.ts        # Download + parse + batch write schematics to DynamoDB (12,997 items)
     backfill-resource-classes.ts  # Backfill classPath/classCategory/classGroup on existing resource items
     backfill-resource-history.ts  # Backfill classification + flattened stats on existing history items
   data/                       # Downloaded XML + generated dashboards (gitignored)
@@ -210,16 +230,16 @@ swg-legends-localstack-infra/
 
 | Service | Count | Details |
 |---------|-------|---------|
-| DynamoDB tables | 5 | resources (by-planet + by-category GSIs), resource-history (by-category GSI), event-log, alert-rules, resource-classes (by-parent + by-path GSIs) |
-| Lambda functions | 16 | 2 compute (SQS-triggered), 6 API (Gateway-triggered), 7 pipeline (Step Functions), 1 archive |
+| DynamoDB tables | 6 | resources (by-planet + by-category GSIs), resource-history (by-category GSI), event-log, alert-rules, resource-classes (by-parent + by-path GSIs), schematics (by-category GSI) |
+| Lambda functions | 17 | 2 compute (SQS-triggered), 7 API (Gateway-triggered), 7 pipeline (Step Functions), 1 archive |
 | S3 buckets | 2 | swg-legends-data (XML archives + class tree JSON), swg-legends-frontend (static hosting) |
 | SQS queues | 2 | spawn-events, despawn-events |
 | SNS topics | 2 | resource-spawned, resource-despawned |
-| API Gateway | 1 REST API | 12 endpoints: GET /resources, GET /resources/{id}, GET /history, GET /history/{id}, GET /events, GET /alerts/rules, POST /alerts/rules, PUT /alerts/rules/{ruleId}, DELETE /alerts/rules/{ruleId}, GET /alerts/history, GET /pipeline/status, GET /ops/dashboard |
+| API Gateway | 1 REST API | 14 endpoints: GET /resources, GET /resources/{id}, GET /history, GET /history/{id}, GET /events, GET /alerts/rules, POST /alerts/rules, PUT /alerts/rules/{ruleId}, DELETE /alerts/rules/{ruleId}, GET /alerts/history, GET /pipeline/status, GET /ops/dashboard, GET /schematics, GET /schematics/{id} |
 | Step Functions | 1 state machine | 7-step ingestion pipeline |
 | EventBridge | 1 scheduled rule | Periodic pipeline trigger |
 | CloudWatch | 1 dashboard + 1 alarm | Monitoring (limited in LocalStack free tier) |
-| OpenTofu modules | 8 | storage, messaging, compute, api, orchestration, monitoring, classification, frontend |
+| OpenTofu modules | 9 | storage, messaging, compute, api, orchestration, monitoring, classification, schematics, frontend |
 
 ## Key npm Scripts
 
@@ -228,7 +248,7 @@ swg-legends-localstack-infra/
 |--------|-------------|
 | `npm run localstack:up` | Start LocalStack container |
 | `npm run localstack:reset` | Wipe all data and restart fresh |
-| `npm run lambda:build` | Build + bundle + deploy all 16 Lambda functions |
+| `npm run lambda:build` | Build + bundle + deploy all 17 Lambda functions |
 
 ### Classification
 | Script | What it does |
@@ -237,6 +257,14 @@ swg-legends-localstack-infra/
 | `npm run seed:classes` | Load resource-class-tree.json into resource-classes DynamoDB table |
 | `npm run backfill:classes` | Backfill classPath/classCategory/classGroup on existing resource items |
 | `npm run backfill:history` | Backfill classification + flattened stats on existing history items |
+
+### Schematics
+| Script | What it does |
+|--------|-------------|
+| `npm run schematics:download` | Download + decompress schematics XML from SWGAide |
+| `npm run schematics:ingest` | Dry-run: download + parse + validate + print summary (no DB write) |
+| `npm run schematics:seed` | Full pipeline: download + parse + batch write to DynamoDB (12,997 items) |
+| `npm run schematics:query` | Query schematics by name/class/category/id |
 
 ### Data & Pipeline
 | Script | What it does |
@@ -264,7 +292,7 @@ swg-legends-localstack-infra/
 ### OpenTofu (per-module)
 | Script | What it does |
 |--------|-------------|
-| `npm run tofu:init:<module>` | Initialize module (storage, messaging, compute, api, orchestration, monitoring, classification) |
+| `npm run tofu:init:<module>` | Initialize module (storage, messaging, compute, api, orchestration, monitoring, classification, schematics) |
 | `npm run tofu:plan:<module>` | Show planned changes |
 | `npm run tofu:apply:<module>` | Apply changes |
 | `npm run tofu:destroy:<module>` | Destroy module resources |
@@ -297,7 +325,7 @@ Ingestion validates resources against the class hierarchy and warns on unknown c
 - Semi-active SWG Legends player
 - Also plays EVE Online and World of Tanks -- may build similar projects for those later
 - Now has hands-on experience with all major AWS services in this project
-- Comfortable with TypeScript, React, AWS SDK v3, OpenTofu, Docker Compose
+- Comfortable with TypeScript, React, TanStack Query, AWS SDK v3, OpenTofu, Docker Compose
 - Understands the "why" behind each service and when to use what
 - Prefers learning the widely-used, general-purpose tools first; niche things later
 - Asks good questions about architecture tradeoffs -- explain reasoning, not just instructions
@@ -310,10 +338,9 @@ These teach new AWS concepts while delivering meaningful features.
 
 | Item | New Infra Learned | Feature Value |
 |------|-------------------|---------------|
-| **Schematics pipeline (phase 1: ingestion)** | Second data pipeline, new DynamoDB table design, multi-source ingestion | Foundation for crafting helper |
 | **DynamoDB TTL (Time-To-Live)** | DynamoDB lifecycle management, automatic item expiration | Keeps event-log and history from growing unbounded |
 | **Resource notifications (SNS email)** | SNS email subscriptions, delivery mechanisms | Makes alerts actually *alert* you -- fired alerts trigger real emails |
-| **Lambda layers** | Lambda code sharing pattern | Cleans up duplicated classification cache loading across 4+ Lambdas |
+| **Lambda layers** | Lambda code sharing pattern | Cleans up duplicated classification cache loading across 5+ Lambdas |
 
 ### Tier 2: High Feature Value, Familiar Infra
 
@@ -321,8 +348,8 @@ These use patterns already learned but deliver strong user-facing results.
 
 | Item | Why |
 |------|-----|
-| **Schematics (phase 2: best resource endpoint)** | The payoff -- `GET /schematics/{name}/best-resources` applies stat weights to find optimal resources |
-| **Schematics (phase 3: profile page integration)** | "This resource is great for X, Y, Z schematics" section on the Resource Profile page |
+| **Schematic Profile page** | Dedicated `/schematics/{id}` page showing full recipe detail, ingredient breakdown, and best current/historical resources for each slot. API endpoint already exists. |
+| **Best resource scoring endpoint** | `GET /schematics/{id}/best-resources` applies experimental stat weights to rank current resources per ingredient slot |
 | **Crafting calculator page** | Select a schematic, see what active/historical resources would give the best results |
 | **Resource comparison** | On the Resource Profile page, show how this resource ranks against other active/past resources of the same class |
 | **Pagination** | Server-side pagination with DynamoDB cursor tokens (ExclusiveStartKey pattern) as data grows |
