@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useResource, useHistoryResource, useClassTree } from "../api/hooks";
-import type { ClassTreeNode } from "../api/types";
+import { useResource, useHistoryResource, useClassTree, useSchematicsByClass } from "../api/hooks";
+import type { ClassTreeNode, SchematicSummary } from "../api/types";
 import { STAT_KEYS } from "../api/types";
 import StatBar from "../components/StatBar";
 import StatusBadge from "../components/StatusBadge";
@@ -135,6 +135,26 @@ export default function ResourceProfile() {
       }));
   }, [resource, statCaps]);
 
+  // Fetch schematics that use this resource's class (hierarchy-aware)
+  const schematicsQuery = useSchematicsByClass(resource?.resourceClass ?? "");
+  const schematics = schematicsQuery.data ?? [];
+
+  // Group schematics by the matched class for display
+  const schematicsByClass = useMemo(() => {
+    const groups = new Map<string, SchematicSummary[]>();
+    for (const s of schematics) {
+      const cls = s.matchedClass ?? "Unknown";
+      if (!groups.has(cls)) groups.set(cls, []);
+      groups.get(cls)!.push(s);
+    }
+    // Sort groups: exact class first, then by hierarchy depth (most specific first)
+    return [...groups.entries()].sort((a, b) => {
+      if (a[0] === resource?.resourceClass) return -1;
+      if (b[0] === resource?.resourceClass) return 1;
+      return a[0].localeCompare(b[0]);
+    });
+  }, [schematics, resource]);
+
   if (loading) {
     return (
       <div className="profile-page">
@@ -245,6 +265,42 @@ export default function ResourceProfile() {
         {statsWithCaps.length === 0 && statsWithoutCaps.length === 0 && (
           <p className="profile-empty">No stat data available.</p>
         )}
+      </div>
+
+      {/* Used In Schematics section */}
+      <div className="profile-section">
+        <h2 className="section-title">
+          Used In Schematics
+          {schematics.length > 0 && (
+            <span className="schematics-count">{schematics.length}</span>
+          )}
+        </h2>
+        {schematicsQuery.isLoading && (
+          <p className="profile-empty">Loading schematics...</p>
+        )}
+        {!schematicsQuery.isLoading && schematics.length === 0 && (
+          <p className="profile-empty">No schematics use this resource class.</p>
+        )}
+        {schematicsByClass.map(([className, items]) => (
+          <div key={className} className="schematics-group">
+            <div className="schematics-group-header">
+              <span className="schematics-group-label">as</span>
+              <span className="schematics-group-class">{className}</span>
+              <span className="schematics-group-count">{items.length}</span>
+            </div>
+            <div className="schematics-list">
+              {items.slice(0, 10).map((s) => (
+                <div key={s.schematicId} className="schematic-chip">
+                  <span className="schematic-name">{s.name}</span>
+                  <span className={`schematic-base schematic-base--${s.base}`}>{s.base}</span>
+                </div>
+              ))}
+              {items.length > 10 && (
+                <span className="schematics-more">+{items.length - 10} more</span>
+              )}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

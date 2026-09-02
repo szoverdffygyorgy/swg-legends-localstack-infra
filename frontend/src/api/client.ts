@@ -19,6 +19,8 @@ import type {
   ClassTreeNode,
   PipelineStatusResponse,
   OpsDashboardResponse,
+  SchematicListResponse,
+  SchematicDetail,
 } from "./types";
 
 // In dev mode (Vite proxy), /api is proxied to LocalStack API Gateway.
@@ -179,4 +181,24 @@ export async function getClassTree(): Promise<ClassTreeNode[]> {
     throw new Error(`Failed to load class tree: ${response.status}`);
   }
   return (await response.json()) as ClassTreeNode[];
+}
+
+// ─── Schematics ──────────────────────────────────────────────────────
+
+export async function getSchematicsByClass(
+  className: string,
+  hierarchy = true
+): Promise<SchematicListResponse> {
+  const params = new URLSearchParams();
+  params.set("class", className);
+  if (hierarchy) params.set("hierarchy", "true");
+  return fetchJson<SchematicListResponse>(
+    `${BASE}/schematics?${params.toString()}`
+  );
+}
+
+export async function getSchematicById(
+  id: string
+): Promise<SchematicDetail> {
+  return fetchJson<SchematicDetail>(`${BASE}/schematics/${id}`);
 }

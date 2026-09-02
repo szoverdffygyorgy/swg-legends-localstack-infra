@@ -62,6 +62,10 @@ const LAMBDAS = [
     name: "api-get-history",
     entry: "src/lambda/api-get-history/handler.ts",
   },
+  {
+    name: "api-get-schematics",
+    entry: "src/lambda/api-get-schematics/handler.ts",
+  },
   // Orchestration: Pipeline Step Functions Lambdas
   {
     name: "pipeline-download",

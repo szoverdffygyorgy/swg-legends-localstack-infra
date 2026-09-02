@@ -80,6 +80,8 @@ resource "aws_api_gateway_rest_api" "swg_api" {
 #       └── /ops/dashboard
 #   └── /history
 #       └── /history/{id}
+#   └── /schematics
+#       └── /schematics/{id}
 
 resource "aws_api_gateway_resource" "resources" {
   rest_api_id = aws_api_gateway_rest_api.swg_api.id
@@ -156,6 +158,18 @@ resource "aws_api_gateway_resource" "history" {
 resource "aws_api_gateway_resource" "history_by_id" {
   rest_api_id = aws_api_gateway_rest_api.swg_api.id
   parent_id   = aws_api_gateway_resource.history.id
+  path_part   = "{id}"
+}
+
+resource "aws_api_gateway_resource" "schematics" {
+  rest_api_id = aws_api_gateway_rest_api.swg_api.id
+  parent_id   = aws_api_gateway_rest_api.swg_api.root_resource_id
+  path_part   = "schematics"
+}
+
+resource "aws_api_gateway_resource" "schematic_by_id" {
+  rest_api_id = aws_api_gateway_rest_api.swg_api.id
+  parent_id   = aws_api_gateway_resource.schematics.id
   path_part   = "{id}"
 }
 
@@ -389,6 +403,42 @@ resource "aws_api_gateway_integration" "get_history_by_id" {
   uri                     = aws_lambda_function.api_get_history.invoke_arn
 }
 
+# ─── GET /schematics ──────────────────────────────────────────────────
+
+resource "aws_api_gateway_method" "get_schematics" {
+  rest_api_id   = aws_api_gateway_rest_api.swg_api.id
+  resource_id   = aws_api_gateway_resource.schematics.id
+  http_method   = "GET"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "get_schematics" {
+  rest_api_id             = aws_api_gateway_rest_api.swg_api.id
+  resource_id             = aws_api_gateway_resource.schematics.id
+  http_method             = aws_api_gateway_method.get_schematics.http_method
+  type                    = "AWS_PROXY"
+  integration_http_method = "POST"
+  uri                     = aws_lambda_function.api_get_schematics.invoke_arn
+}
+
+# ─── GET /schematics/{id} ────────────────────────────────────────────
+
+resource "aws_api_gateway_method" "get_schematic_by_id" {
+  rest_api_id   = aws_api_gateway_rest_api.swg_api.id
+  resource_id   = aws_api_gateway_resource.schematic_by_id.id
+  http_method   = "GET"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "get_schematic_by_id" {
+  rest_api_id             = aws_api_gateway_rest_api.swg_api.id
+  resource_id             = aws_api_gateway_resource.schematic_by_id.id
+  http_method             = aws_api_gateway_method.get_schematic_by_id.http_method
+  type                    = "AWS_PROXY"
+  integration_http_method = "POST"
+  uri                     = aws_lambda_function.api_get_schematics.invoke_arn
+}
+
 # ═══════════════════════════════════════════════════════════════════════
 # DEPLOYMENT + STAGE
 # ═══════════════════════════════════════════════════════════════════════
@@ -444,6 +494,12 @@ resource "aws_api_gateway_deployment" "swg_api" {
       aws_api_gateway_method.get_history_by_id.id,
       aws_api_gateway_integration.get_history.id,
       aws_api_gateway_integration.get_history_by_id.id,
+      aws_api_gateway_resource.schematics.id,
+      aws_api_gateway_resource.schematic_by_id.id,
+      aws_api_gateway_method.get_schematics.id,
+      aws_api_gateway_method.get_schematic_by_id.id,
+      aws_api_gateway_integration.get_schematics.id,
+      aws_api_gateway_integration.get_schematic_by_id.id,
     ]))
   }
 
@@ -513,6 +569,14 @@ resource "aws_lambda_permission" "apigw_get_history" {
   statement_id  = "AllowAPIGatewayInvoke"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.api_get_history.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.swg_api.execution_arn}/*"
+}
+
+resource "aws_lambda_permission" "apigw_get_schematics" {
+  statement_id  = "AllowAPIGatewayInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.api_get_schematics.function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_api_gateway_rest_api.swg_api.execution_arn}/*"
 }

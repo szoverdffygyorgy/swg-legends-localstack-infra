@@ -26,6 +26,8 @@ import {
   getPipelineStatus,
   getOpsDashboard,
   getClassTree,
+  getSchematicsByClass,
+  getSchematicById,
   type ResourceFilters,
   type HistoryFilters,
 } from "./client";
@@ -45,6 +47,8 @@ export const queryKeys = {
   events: (date: string, type?: string) => ["events", { date, type }] as const,
   pipelineStatus: ["pipelineStatus"] as const,
   opsDashboard: (logFunction: string) => ["opsDashboard", logFunction] as const,
+  schematicsByClass: (className: string) => ["schematicsByClass", className] as const,
+  schematic: (id: string) => ["schematic", id] as const,
 };
 
 // ─── Classification (static data) ───────────────────────────────────
@@ -199,5 +203,25 @@ export function useOpsDashboard(logFunction: string, autoRefresh: boolean) {
     queryKey: queryKeys.opsDashboard(logFunction),
     queryFn: () => getOpsDashboard(logFunction),
     refetchInterval: autoRefresh ? 5_000 : false,
+  });
+}
+
+// ─── Schematics ─────────────────────────────────────────────────────
+
+/** Find schematics that use a resource class (hierarchy-aware). */
+export function useSchematicsByClass(className: string) {
+  return useQuery({
+    queryKey: queryKeys.schematicsByClass(className),
+    queryFn: () => getSchematicsByClass(className, true).then((d) => d.schematics),
+    enabled: !!className,
+  });
+}
+
+/** Get a single schematic by ID. */
+export function useSchematic(id: string) {
+  return useQuery({
+    queryKey: queryKeys.schematic(id),
+    queryFn: () => getSchematicById(id),
+    enabled: !!id,
   });
 }

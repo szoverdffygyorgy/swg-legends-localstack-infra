@@ -202,3 +202,33 @@ resource "aws_lambda_function" "api_get_history" {
     Purpose = "API: list historical (despawned) resources"
   }
 }
+
+# ─── api-get-schematics ──────────────────────────────────────────────
+# Handles GET /schematics and GET /schematics/{id}
+# Queries the schematics DynamoDB table (single-table design with
+# SCHEM# metadata items and CLASS# ingredient index items).
+
+resource "aws_lambda_function" "api_get_schematics" {
+  function_name = "api-get-schematics"
+  role          = aws_iam_role.api_lambda_execution.arn
+  handler       = "index.handler"
+  runtime       = "nodejs22.x"
+  filename      = data.archive_file.api_lambda_placeholder.output_path
+  timeout       = 30
+  memory_size   = 128
+
+  environment {
+    variables = {
+      LOCALSTACK_ENDPOINT    = "http://host.docker.internal:4566"
+      AWS_REGION_CUSTOM      = var.aws_region
+      SCHEMATICS_TABLE       = "schematics"
+      RESOURCE_CLASSES_TABLE = "resource-classes"
+    }
+  }
+
+  tags = {
+    Project = "swg-legends"
+    Module  = "api"
+    Purpose = "API: list/search/get schematics"
+  }
+}

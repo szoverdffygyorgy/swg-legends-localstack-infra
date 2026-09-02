@@ -251,3 +251,63 @@ export interface OpsDashboardResponse {
   recentLogs: LogEntry[];
   logFunction: string;
 }
+
+// ─── Schematics ──────────────────────────────────────────────────────
+
+export interface SchematicSummary {
+  schematicId: string;
+  name: string;
+  base: "nge" | "precu";
+  category: string;
+  matchedClass?: string;
+}
+
+export interface SchematicIngredient {
+  type: "resource" | "component";
+  classId?: string;
+  className?: string;
+  desc: string;
+  units?: number;
+  componentId?: string;
+  componentType?: string;
+  count?: number;
+  similar?: boolean;
+  optional?: boolean;
+}
+
+export interface ExperimentalProperty {
+  name: string;
+  weights: Partial<Record<StatKey, number>>;
+}
+
+export interface ExperimentalGroup {
+  group: string;
+  properties: ExperimentalProperty[];
+}
+
+export interface SchematicDetail {
+  pk: string;
+  sk: string;
+  schematicId: string;
+  name: string;
+  category: string;
+  base: "nge" | "precu";
+  description?: string;
+  complexity: number;
+  xp: number;
+  dataSize: number;
+  manufacture: boolean;
+  type: string;
+  crateSize: number;
+  quality: string;
+  profession: string;
+  professionLevel: number;
+  ingredients: SchematicIngredient[];
+  experimentalGroups: ExperimentalGroup[];
+}
+
+export interface SchematicListResponse {
+  count: number;
+  filters: Record<string, unknown>;
+  schematics: SchematicSummary[];
+}

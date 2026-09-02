@@ -186,3 +186,102 @@
   color: var(--text-dim);
   font-size: 0.9rem;
 }
+
+/* ─── Used In Schematics ─────────────────────────────── */
+
+.schematics-count {
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border-radius: var(--radius);
+  margin-left: 8px;
+  font-weight: 400;
+}
+
+.schematics-group {
+  margin-bottom: 16px;
+}
+
+.schematics-group:last-child {
+  margin-bottom: 0;
+}
+
+.schematics-group-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.schematics-group-label {
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  font-style: italic;
+}
+
+.schematics-group-class {
+  color: var(--accent-cyan);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.schematics-group-count {
+  background: var(--bg-surface);
+  color: var(--text-dim);
+  font-size: 0.65rem;
+  padding: 1px 6px;
+  border-radius: var(--radius);
+}
+
+.schematics-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.schematic-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 4px 10px;
+  transition: border-color var(--transition);
+}
+
+.schematic-chip:hover {
+  border-color: var(--border-light);
+}
+
+.schematic-name {
+  color: var(--text-primary);
+  font-size: 0.8rem;
+}
+
+.schematic-base {
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  padding: 1px 4px;
+  border-radius: 2px;
+}
+
+.schematic-base--nge {
+  color: var(--status-ok);
+  background: var(--status-ok-bg);
+}
+
+.schematic-base--precu {
+  color: var(--text-dim);
+  background: var(--bg-deep);
+}
+
+.schematics-more {
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  font-style: italic;
+  padding: 4px 8px;
+}
