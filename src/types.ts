@@ -245,3 +245,114 @@ export interface EventLogItem {
   /** Description of the data issue (only for DATA_ISSUE events) */
   issue?: string;
 }
+
+// ─── Schematic types ─────────────────────────────────────────────────
+// Parsed from SWGAide's schematics_unity.xml.gz export. Each schematic
+// describes a craftable item: what resources/components it requires,
+// what stats matter (experimental groups), and metadata about the recipe.
+
+/** A single ingredient in a schematic (resource or component). */
+export interface SchematicIngredient {
+  /** "resource" = raw resource class, "component" = crafted sub-component */
+  type: "resource" | "component";
+
+  /** SWGAide resource class abbreviation (e.g., "mtl", "cpr") -- resources only */
+  classId?: string;
+
+  /** Resolved class name from the class tree (e.g., "Metal", "Copper") -- resources only */
+  className?: string;
+
+  /** Slot description from the XML (e.g., "armor_segment_zam", "Synthesis Data Storage") */
+  desc: string;
+
+  /** Number of units required -- resources only */
+  units?: number;
+
+  /** Component schematic ID or name -- components only */
+  componentId?: string;
+
+  /** Component reference type: "schematic" (by ID) or "item" (by name) */
+  componentType?: string;
+
+  /** Number of components required -- components only */
+  count?: number;
+
+  /** Whether similar components can substitute */
+  similar?: boolean;
+
+  /** Whether this component is optional */
+  optional?: boolean;
+}
+
+/** A single experimental property with stat weights. */
+export interface ExperimentalProperty {
+  /** Property name (e.g., "Armor Effectiveness", "Quality") */
+  name: string;
+
+  /**
+   * Stat weights as percentages. Keys are stat abbreviations (er, cr, etc.).
+   * Values sum to 100 within a property.
+   * e.g., { oq: 50, sr: 50 } means OQ and SR each contribute 50%.
+   */
+  weights: Partial<Record<StatKey, number>>;
+}
+
+/** A group of related experimental properties. */
+export interface ExperimentalGroup {
+  /** Group name (e.g., "Experimental Quality", "Experimental Durability") */
+  group: string;
+
+  /** Properties within this group */
+  properties: ExperimentalProperty[];
+}
+
+/** A fully parsed schematic from the SWGAide XML export. */
+export interface Schematic {
+  /** SWGAide schematic ID (unique) */
+  schematicId: string;
+
+  /** Schematic name (e.g., "Mabari Armorweave Boots") */
+  name: string;
+
+  /** SWGAide category ID */
+  category: string;
+
+  /** Game version: "nge" or "precu" */
+  base: "nge" | "precu";
+
+  /** Flavor text / description */
+  description: string;
+
+  /** Crafting complexity */
+  complexity: number;
+
+  /** XP gained from crafting */
+  xp: number;
+
+  /** Data pads required */
+  dataSize: number;
+
+  /** Can be manufactured in a factory */
+  manufacture: boolean;
+
+  /** Schematic type (e.g., "Regular") */
+  type: string;
+
+  /** Factory crate size (0 = not cratable) */
+  crateSize: number;
+
+  /** Quality indicator: "lq", "hq", "n/a", "mixed" */
+  quality: string;
+
+  /** Profession ID */
+  profession: string;
+
+  /** Required profession level */
+  professionLevel: number;
+
+  /** Resource and component ingredients */
+  ingredients: SchematicIngredient[];
+
+  /** Experimental groups with stat weights */
+  experimentalGroups: ExperimentalGroup[];
+}

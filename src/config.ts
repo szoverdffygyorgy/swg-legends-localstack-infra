@@ -93,6 +93,13 @@ export const RESOURCE_CLASSES_TABLE = "resource-classes";
 export const SWGAIDE_RESOURCES_URL =
   "https://swgaide.com/pub/exports/currentresources_138.xml.gz";
 
+/** SWGAide schematics export URL (all servers, "unity" format) */
+export const SWGAIDE_SCHEMATICS_URL =
+  "https://swgaide.com/pub/exports/schematics_unity.xml.gz";
+
+/** DynamoDB table name for schematics */
+export const SCHEMATICS_TABLE = "schematics";
+
 // ─── Messaging constants ─────────────────────────────────────────────
 // LocalStack uses account ID 000000000000 for all resources.
 // ARNs and URLs follow the same format as real AWS.

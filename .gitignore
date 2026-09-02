@@ -24,6 +24,9 @@ frontend/dist/
 # Downloaded data (large XML/gzip exports from SWGAide)
 data/
 
+# Static reference data in src/data/ should be tracked
+!src/data/
+
 # Corporate proxy CA certificates (machine-specific)
 certs/
 
