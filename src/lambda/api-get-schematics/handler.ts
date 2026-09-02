@@ -176,6 +176,8 @@ async function queryByClass(
               base: item.base,
               category: item.category,
               matchedClass: cls,
+              quality: item.quality,
+              experimentalGroups: item.experimentalGroups,
             });
           }
         }

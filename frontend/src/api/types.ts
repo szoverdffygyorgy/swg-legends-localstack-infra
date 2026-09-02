@@ -260,6 +260,8 @@ export interface SchematicSummary {
   base: "nge" | "precu";
   category: string;
   matchedClass?: string;
+  quality?: string;
+  experimentalGroups?: ExperimentalGroup[];
 }
 
 export interface SchematicIngredient {

@@ -1,0 +1,362 @@
+/* ─── Schematic description ────────────────────────────── */
+
+.schem-description {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+/* ─── Section subtitle ────────────────────────────────── */
+
+.section-subtitle {
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  font-weight: 400;
+  margin: 0 0 16px 0;
+}
+
+/* ─── Ingredients grid ────────────────────────────────── */
+
+.ingredients-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.ingredient-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ingredient-card--resource {
+  border-left: 3px solid var(--accent-cyan);
+}
+
+.ingredient-card--component {
+  border-left: 3px solid var(--accent-gold-dim);
+}
+
+.ingredient-type-badge {
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.ingredient-desc {
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.ingredient-class {
+  color: var(--accent-cyan);
+  font-size: 0.8rem;
+}
+
+.ingredient-units {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-family: "Share Tech Mono", monospace;
+}
+
+.ingredient-optional {
+  display: inline-block;
+  align-self: flex-start;
+  color: var(--text-dim);
+  font-size: 0.6rem;
+  font-style: italic;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: 1px 6px;
+}
+
+/* ─── Experimental groups ─────────────────────────────── */
+
+.exp-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.exp-group-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+}
+
+.exp-group-name {
+  color: var(--accent-gold);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+.exp-properties {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.exp-property {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.exp-property-name {
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  min-width: 140px;
+}
+
+.exp-weights {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.exp-weight-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-deep);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 2px 8px;
+  font-family: "Share Tech Mono", monospace;
+  font-size: 0.75rem;
+}
+
+.exp-weight-stat {
+  color: var(--accent-gold-dim);
+  font-weight: 600;
+}
+
+.exp-weight-value {
+  color: var(--text-secondary);
+}
+
+/* ─── Resource slot (per ingredient class) ────────────── */
+
+.resource-slot {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.resource-slot:first-of-type {
+  margin-top: 8px;
+  padding-top: 0;
+  border-top: none;
+}
+
+.resource-slot--history {
+  opacity: 0.8;
+}
+
+.resource-slot-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.resource-slot-class {
+  color: var(--accent-cyan);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.resource-slot-count {
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  font-family: "Share Tech Mono", monospace;
+}
+
+/* ─── Resource ranking table ──────────────────────────── */
+
+.resource-ranking {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-x: auto;
+}
+
+.ranking-header-row {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 4px 8px;
+  color: var(--text-dim);
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.ranking-row {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 6px 8px;
+  background: var(--bg-surface);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color var(--transition), background var(--transition);
+}
+
+.ranking-row:hover {
+  border-color: var(--border-light);
+  background: var(--bg-hover);
+}
+
+.ranking-row--history {
+  opacity: 0.7;
+}
+
+.ranking-row--history:hover {
+  opacity: 1;
+}
+
+/* ─── Ranking columns ─────────────────────────────────── */
+
+.ranking-col {
+  flex-shrink: 0;
+  font-family: "Share Tech Mono", monospace;
+  font-size: 0.8rem;
+}
+
+.ranking-col--rank {
+  width: 28px;
+  text-align: center;
+  color: var(--text-dim);
+}
+
+.ranking-col--name {
+  flex: 1 1 140px;
+  min-width: 100px;
+  color: var(--text-primary);
+  font-family: "Rajdhani", sans-serif;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ranking-col--class {
+  width: 120px;
+  color: var(--text-secondary);
+  font-family: "Rajdhani", sans-serif;
+  font-size: 0.75rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ranking-col--score {
+  width: 50px;
+  text-align: right;
+  font-weight: 700;
+  padding-right: 8px;
+}
+
+.ranking-col--stat {
+  width: 44px;
+  text-align: right;
+  color: var(--text-secondary);
+}
+
+/* ─── Score tier colors ───────────────────────────────── */
+
+.score--top {
+  color: var(--stat-top);
+  text-shadow: 0 0 6px rgba(176, 128, 224, 0.4);
+}
+
+.score--high {
+  color: var(--stat-high);
+}
+
+.score--fair {
+  color: var(--stat-fair);
+}
+
+.score--mid {
+  color: var(--stat-mid);
+}
+
+.score--low {
+  color: var(--stat-low);
+}
+
+/* ─── Show more / less button ─────────────────────────── */
+
+.ranking-more-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-family: "Share Tech Mono", monospace;
+  font-size: 0.75rem;
+  padding: 4px 12px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  margin-top: 4px;
+  align-self: flex-start;
+  transition: color var(--transition), border-color var(--transition);
+}
+
+.ranking-more-btn:hover {
+  color: var(--accent-cyan);
+  border-color: var(--border-focus);
+}
+
+/* ─── History toggle ──────────────────────────────────── */
+
+.history-toggle {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.history-toggle-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-family: "Share Tech Mono", monospace;
+  font-size: 0.8rem;
+  padding: 6px 16px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: color var(--transition), border-color var(--transition);
+}
+
+.history-toggle-btn:hover {
+  color: var(--accent-cyan);
+  border-color: var(--border-focus);
+}
+
+.history-section {
+  margin-top: 16px;
+}
+
+.history-subtitle {
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}

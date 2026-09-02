@@ -1,8 +1,13 @@
-import { useMemo } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useMemo, useState } from "react";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import { useResource, useHistoryResource, useClassTree, useSchematicsByClass } from "../api/hooks";
-import type { ClassTreeNode, SchematicSummary } from "../api/types";
+import type { ClassTreeNode, SchematicSummary, StatKey } from "../api/types";
 import { STAT_KEYS } from "../api/types";
+import {
+  computeOverallScore,
+  scoreTierClass,
+  type FlatStats,
+} from "../utils/scoring";
 import StatBar from "../components/StatBar";
 import StatusBadge from "../components/StatusBadge";
 import LoadingSpinner from "../components/LoadingSpinner";
@@ -55,6 +60,9 @@ function buildClassBreadcrumb(
 export default function ResourceProfile() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [showLowScores, setShowLowScores] = useState(false);
+  const [showPrecu, setShowPrecu] = useState(false);
 
   const activeQuery = useResource(id ?? "");
   const historyQuery = useHistoryResource(id ?? "");
@@ -139,21 +147,65 @@ export default function ResourceProfile() {
   const schematicsQuery = useSchematicsByClass(resource?.resourceClass ?? "");
   const schematics = schematicsQuery.data ?? [];
 
-  // Group schematics by the matched class for display
+  // Build flat stats for scoring
+  const flatStats: FlatStats = useMemo(() => {
+    if (!resource) return {};
+    const stats: FlatStats = {};
+    for (const [k, v] of Object.entries(resource.stats)) {
+      stats[k as StatKey] = v;
+    }
+    return stats;
+  }, [resource]);
+
+  // Group schematics by the matched class, compute scores, sort by score descending
   const schematicsByClass = useMemo(() => {
-    const groups = new Map<string, SchematicSummary[]>();
+    const groups = new Map<string, ScoredSchematic[]>();
     for (const s of schematics) {
       const cls = s.matchedClass ?? "Unknown";
       if (!groups.has(cls)) groups.set(cls, []);
-      groups.get(cls)!.push(s);
+
+      const expGroups = s.experimentalGroups ?? [];
+      const isLq = s.quality === "lq";
+      const hasExperimental = expGroups.length > 0;
+      const score = hasExperimental && !isLq
+        ? computeOverallScore(flatStats, expGroups)
+        : null;
+
+      groups.get(cls)!.push({
+        ...s,
+        score,
+        isLq,
+        hasExperimental,
+      });
     }
+
+    // Sort within each group: scored items by score desc, then lq/no-exp at bottom
+    for (const [, items] of groups) {
+      items.sort((a, b) => {
+        if (a.score !== null && b.score !== null) return b.score - a.score;
+        if (a.score !== null) return -1;
+        if (b.score !== null) return 1;
+        return a.name.localeCompare(b.name);
+      });
+    }
+
     // Sort groups: exact class first, then by hierarchy depth (most specific first)
     return [...groups.entries()].sort((a, b) => {
       if (a[0] === resource?.resourceClass) return -1;
       if (b[0] === resource?.resourceClass) return 1;
       return a[0].localeCompare(b[0]);
     });
-  }, [schematics, resource]);
+  }, [schematics, resource, flatStats]);
+
+  // Total filtered schematic count for the section header
+  const filteredSchematicCount = useMemo(() => {
+    return schematics.filter((s) => {
+      if (!showPrecu && s.base === "precu") return false;
+      // For the header count, we include low-score items regardless of toggle
+      // since the toggle only affects visibility within groups
+      return true;
+    }).length;
+  }, [schematics, showPrecu]);
 
   if (loading) {
     return (
@@ -272,7 +324,7 @@ export default function ResourceProfile() {
         <h2 className="section-title">
           Used In Schematics
           {schematics.length > 0 && (
-            <span className="schematics-count">{schematics.length}</span>
+            <span className="schematics-count">{filteredSchematicCount}</span>
           )}
         </h2>
         {schematicsQuery.isLoading && (
@@ -281,27 +333,129 @@ export default function ResourceProfile() {
         {!schematicsQuery.isLoading && schematics.length === 0 && (
           <p className="profile-empty">No schematics use this resource class.</p>
         )}
-        {schematicsByClass.map(([className, items]) => (
-          <div key={className} className="schematics-group">
-            <div className="schematics-group-header">
-              <span className="schematics-group-label">as</span>
-              <span className="schematics-group-class">{className}</span>
-              <span className="schematics-group-count">{items.length}</span>
-            </div>
-            <div className="schematics-list">
-              {items.slice(0, 10).map((s) => (
-                <div key={s.schematicId} className="schematic-chip">
-                  <span className="schematic-name">{s.name}</span>
-                  <span className={`schematic-base schematic-base--${s.base}`}>{s.base}</span>
-                </div>
-              ))}
-              {items.length > 10 && (
-                <span className="schematics-more">+{items.length - 10} more</span>
+        {!schematicsQuery.isLoading && schematics.length > 0 && (
+          <div className="schematics-controls">
+            <label className="schematics-toggle">
+              <input
+                type="checkbox"
+                checked={showLowScores}
+                onChange={(e) => setShowLowScores(e.target.checked)}
+              />
+              Show low scores (&lt; 500)
+            </label>
+            <label className="schematics-toggle">
+              <input
+                type="checkbox"
+                checked={showPrecu}
+                onChange={(e) => setShowPrecu(e.target.checked)}
+              />
+              Show preCU schematics
+            </label>
+          </div>
+        )}
+        {schematicsByClass.map(([className, items]) => {
+          const isExpanded = expandedGroups.has(className);
+          const visible = items.filter((s) => {
+            if (!showPrecu && s.base === "precu") return false;
+            if (!showLowScores && s.score !== null && s.score < 500) return false;
+            return true;
+          });
+          const hidden = items.length - visible.length;
+
+          if (visible.length === 0 && !isExpanded) return null;
+
+          return (
+            <div key={className} className="schematics-group">
+              <button
+                className="schematics-group-header schematics-group-header--toggle"
+                onClick={() => {
+                  setExpandedGroups((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(className)) next.delete(className);
+                    else next.add(className);
+                    return next;
+                  });
+                }}
+              >
+                <span className="schematics-group-arrow">
+                  {isExpanded ? "\u25BC" : "\u25B6"}
+                </span>
+                <span className="schematics-group-label">as</span>
+                <span className="schematics-group-class">{className}</span>
+                <span className="schematics-group-count">{visible.length}</span>
+                {hidden > 0 && (
+                  <span className="schematics-group-hidden">{hidden} hidden</span>
+                )}
+              </button>
+              {isExpanded && (
+                <SchematicsTable items={visible} />
               )}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
+    </div>
+  );
+}
+
+// ─── Types ───────────────────────────────────────────────────────────
+
+interface ScoredSchematic extends SchematicSummary {
+  score: number | null;
+  isLq: boolean;
+  hasExperimental: boolean;
+}
+
+// ─── Schematics Table (list rows per group) ──────────────────────────
+
+function SchematicsTable({ items }: { items: ScoredSchematic[] }) {
+  const [showAll, setShowAll] = useState(false);
+  const displayCount = showAll ? items.length : 20;
+  const shown = items.slice(0, displayCount);
+  const remaining = items.length - 20;
+
+  if (items.length === 0) {
+    return <p className="profile-empty">All schematics hidden (below score threshold).</p>;
+  }
+
+  return (
+    <div className="schematics-table">
+      <div className="schematics-table-header">
+        <span className="schem-col schem-col--name">Schematic</span>
+        <span className="schem-col schem-col--base">Base</span>
+        <span className="schem-col schem-col--score">Score</span>
+      </div>
+      {shown.map((s) => (
+        <Link
+          key={s.schematicId}
+          to={`/schematics/${s.schematicId}`}
+          className={`schematics-table-row ${s.isLq ? "schematics-table-row--lq" : ""}`}
+        >
+          <span className="schem-col schem-col--name">{s.name}</span>
+          <span className={`schem-col schem-col--base schematic-base schematic-base--${s.base}`}>
+            {s.base}
+          </span>
+          <span className="schem-col schem-col--score">
+            {s.isLq ? (
+              <span className="schem-score-lq">lq</span>
+            ) : s.score !== null ? (
+              <span className={`schem-score ${scoreTierClass(s.score)}`}>{s.score}</span>
+            ) : (
+              <span className="schem-score-na">--</span>
+            )}
+          </span>
+        </Link>
+      ))}
+      {remaining > 0 && !showAll && (
+        <button className="schematics-show-all" onClick={() => setShowAll(true)}>
+          Show all {items.length} schematics
+        </button>
+      )}
+      {showAll && remaining > 0 && (
+        <button className="schematics-show-all" onClick={() => setShowAll(false)}>
+          Show less
+        </button>
+      )}
     </div>
   );
 }

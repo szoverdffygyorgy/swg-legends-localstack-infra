@@ -8,6 +8,7 @@
 
 import {
   useQuery,
+  useQueries,
   useMutation,
   useQueryClient,
   keepPreviousData,
@@ -223,5 +224,35 @@ export function useSchematic(id: string) {
     queryKey: queryKeys.schematic(id),
     queryFn: () => getSchematicById(id),
     enabled: !!id,
+  });
+}
+
+// ─── Batch queries (for Schematic Profile) ──────────────────────────
+
+/**
+ * Fetch active resources for multiple class names in parallel.
+ * Uses useQueries (single hook call) to avoid rules-of-hooks violations
+ * when the number of classes changes between renders.
+ */
+export function useResourcesByClasses(classNames: string[]) {
+  return useQueries({
+    queries: classNames.map((cls) => ({
+      queryKey: queryKeys.resources({ class: cls }),
+      queryFn: () => getResources({ class: cls }).then((d) => d.resources),
+    })),
+  });
+}
+
+/**
+ * Fetch history resources for multiple class names in parallel.
+ * Only runs when enabled is true (lazy-loaded on user action).
+ */
+export function useHistoryByClasses(classNames: string[], enabled: boolean) {
+  return useQueries({
+    queries: classNames.map((cls) => ({
+      queryKey: queryKeys.history({ class: cls }),
+      queryFn: () => getHistory({ class: cls }).then((d) => d.resources),
+      enabled,
+    })),
   });
 }

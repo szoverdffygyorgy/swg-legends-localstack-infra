@@ -72,6 +72,8 @@ function buildClassIndexItems(s: Schematic): Record<string, unknown>[] {
         schematicName: s.name,
         base: s.base,
         category: s.category,
+        quality: s.quality,
+        experimentalGroups: s.experimentalGroups,
       });
     }
   }

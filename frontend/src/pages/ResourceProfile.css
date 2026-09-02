@@ -199,19 +199,61 @@
   font-weight: 400;
 }
 
+/* ─── Controls (show low scores toggle) ───────────────── */
+
+.schematics-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.schematics-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.schematics-toggle input {
+  accent-color: var(--accent-cyan);
+}
+
+/* ─── Collapsible groups ──────────────────────────────── */
+
 .schematics-group {
-  margin-bottom: 16px;
+  margin-bottom: 4px;
 }
 
 .schematics-group:last-child {
   margin-bottom: 0;
 }
 
-.schematics-group-header {
+.schematics-group-header--toggle {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-bottom: 8px;
+  width: 100%;
+  background: none;
+  border: none;
+  border-radius: var(--radius);
+  padding: 6px 8px;
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--transition);
+}
+
+.schematics-group-header--toggle:hover {
+  background: var(--bg-surface);
+}
+
+.schematics-group-arrow {
+  color: var(--text-dim);
+  font-size: 0.6rem;
+  width: 12px;
+  flex-shrink: 0;
 }
 
 .schematics-group-label {
@@ -234,31 +276,81 @@
   border-radius: var(--radius);
 }
 
-.schematics-list {
+.schematics-group-hidden {
+  color: var(--text-dim);
+  font-size: 0.65rem;
+  font-style: italic;
+  margin-left: auto;
+}
+
+/* ─── Schematics table (list rows) ────────────────────── */
+
+.schematics-table {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  flex-direction: column;
+  gap: 1px;
+  padding: 0 0 0 20px;
 }
 
-.schematic-chip {
-  display: inline-flex;
+.schematics-table-header {
+  display: flex;
   align-items: center;
-  gap: 6px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
+  padding: 4px 8px;
+  color: var(--text-dim);
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.schematics-table-row {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
   border-radius: var(--radius);
-  padding: 4px 10px;
-  transition: border-color var(--transition);
+  text-decoration: none;
+  color: inherit;
+  transition: background var(--transition);
 }
 
-.schematic-chip:hover {
-  border-color: var(--border-light);
+.schematics-table-row:hover {
+  background: var(--bg-hover);
 }
 
-.schematic-name {
+.schematics-table-row--lq {
+  opacity: 0.5;
+}
+
+.schematics-table-row--lq:hover {
+  opacity: 0.8;
+}
+
+/* ─── Table columns ───────────────────────────────────── */
+
+.schem-col--name {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--text-primary);
   font-size: 0.8rem;
 }
+
+.schem-col--base {
+  width: 44px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.schem-col--score {
+  width: 50px;
+  text-align: right;
+  flex-shrink: 0;
+  font-family: "Share Tech Mono", monospace;
+}
+
+/* ─── Base badge (reused) ─────────────────────────────── */
 
 .schematic-base {
   font-size: 0.6rem;
@@ -279,9 +371,53 @@
   background: var(--bg-deep);
 }
 
-.schematics-more {
-  color: var(--text-dim);
+/* ─── Score values ────────────────────────────────────── */
+
+.schem-score {
+  font-weight: 700;
   font-size: 0.8rem;
+}
+
+.schem-score-lq {
+  color: var(--text-dim);
+  font-size: 0.7rem;
   font-style: italic;
-  padding: 4px 8px;
+}
+
+.schem-score-na {
+  color: var(--text-dim);
+  font-size: 0.75rem;
+}
+
+/* ─── Score tier colors ───────────────────────────────── */
+
+.score--top {
+  color: var(--stat-top);
+  text-shadow: 0 0 6px rgba(176, 128, 224, 0.4);
+}
+
+.score--high { color: var(--stat-high); }
+.score--fair { color: var(--stat-fair); }
+.score--mid  { color: var(--stat-mid); }
+.score--low  { color: var(--stat-low); }
+
+/* ─── Show all button ─────────────────────────────────── */
+
+.schematics-show-all {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-family: "Share Tech Mono", monospace;
+  font-size: 0.7rem;
+  padding: 4px 12px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  margin-top: 4px;
+  align-self: flex-start;
+  transition: color var(--transition), border-color var(--transition);
+}
+
+.schematics-show-all:hover {
+  color: var(--accent-cyan);
+  border-color: var(--border-focus);
 }
