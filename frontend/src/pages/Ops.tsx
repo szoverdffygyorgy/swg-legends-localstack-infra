@@ -1,7 +1,6 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import { getOpsDashboard } from "../api/client";
+import { useState, useEffect } from "react";
+import { useOpsDashboard } from "../api/hooks";
 import type {
-  OpsDashboardResponse,
   PipelineExecution,
   LogEntry,
 } from "../api/types";
@@ -18,8 +17,6 @@ const LAMBDA_FUNCTIONS = [
   "pipeline-download", "pipeline-parse", "pipeline-diff", "pipeline-update-db",
   "pipeline-log-events", "pipeline-publish-sns", "pipeline-archive",
 ];
-
-const REFRESH_INTERVAL = 5000; // 5s when auto-refreshing
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 
@@ -73,49 +70,25 @@ function lambdaGroup(name: string): string {
 // ─── Component ───────────────────────────────────────────────────────
 
 export default function Ops() {
-  const [data, setData] = useState<OpsDashboardResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [logFunction, setLogFunction] = useState("pipeline-archive");
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [expandedExec, setExpandedExec] = useState<Set<string>>(() => new Set());
-  const refreshTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const fetchData = useCallback(async (showLoading = true) => {
-    if (showLoading) setLoading(true);
-    setError(null);
-    try {
-      const result = await getOpsDashboard(logFunction);
-      setData(result);
-      // Auto-expand first execution on initial load
-      if (showLoading && result.executions.length > 0 && result.executions[0].executionArn) {
-        setExpandedExec(new Set([result.executions[0].executionArn]));
-      }
-      // Auto-enable refresh if a pipeline is running
-      const hasRunning = result.executions.some((e) => e.status === "RUNNING");
-      if (hasRunning && !autoRefresh) {
-        setAutoRefresh(true);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load ops dashboard");
-    } finally {
-      setLoading(false);
-    }
-  }, [logFunction, autoRefresh]);
+  const { data, isLoading, isFetching, error, refetch } = useOpsDashboard(logFunction, autoRefresh);
 
+  // Auto-enable refresh if a pipeline is running
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  // Auto-refresh timer
-  useEffect(() => {
-    if (autoRefresh) {
-      refreshTimer.current = setInterval(() => fetchData(false), REFRESH_INTERVAL);
+    if (data?.executions.some((e) => e.status === "RUNNING") && !autoRefresh) {
+      setAutoRefresh(true);
     }
-    return () => {
-      if (refreshTimer.current) clearInterval(refreshTimer.current);
-    };
-  }, [autoRefresh, fetchData]);
+  }, [data, autoRefresh]);
+
+  // Auto-expand first execution on initial data load
+  useEffect(() => {
+    if (data?.executions.length && expandedExec.size === 0) {
+      setExpandedExec(new Set([data.executions[0].executionArn]));
+    }
+  }, [data, expandedExec.size]);
 
   function toggleExpand(arn: string) {
     setExpandedExec((prev) => {
@@ -125,8 +98,8 @@ export default function Ops() {
     });
   }
 
-  if (loading && !data) return <LoadingSpinner message="Loading ops dashboard..." />;
-  if (error && !data) return <ErrorMessage message={error} onRetry={() => fetchData()} />;
+  if (isLoading && !data) return <LoadingSpinner message="Loading ops dashboard..." />;
+  if (error && !data) return <ErrorMessage message={error instanceof Error ? error.message : "Failed to load ops dashboard"} onRetry={() => refetch()} />;
   if (!data) return null;
 
   const totalDlq = data.queues.reduce((sum, q) => sum + q.dlqMessages, 0);
@@ -166,6 +139,9 @@ export default function Ops() {
           </StatusBadge>
         </div>
         <div className="health-item health-item--right">
+          {isFetching && !isLoading && (
+            <span className="refreshing-indicator">Refreshing...</span>
+          )}
           <button
             className={`btn-refresh ${autoRefresh ? "btn-refresh--active" : ""}`}
             onClick={() => setAutoRefresh((p) => !p)}

@@ -1,6 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
-import { getEvents } from "../api/client";
-import type { EventLogItem } from "../api/types";
+import { useState } from "react";
+import { useEvents } from "../api/hooks";
 import StatusBadge from "../components/StatusBadge";
 import LoadingSpinner from "../components/LoadingSpinner";
 import ErrorMessage from "../components/ErrorMessage";
@@ -13,29 +12,13 @@ function todayString(): string {
 }
 
 export default function Events() {
-  const [events, setEvents] = useState<EventLogItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
   const [date, setDate] = useState(todayString());
   const [typeFilter, setTypeFilter] = useState("");
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await getEvents(date, typeFilter || undefined);
-      setEvents(data.events);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load events");
-    } finally {
-      setLoading(false);
-    }
-  }, [date, typeFilter]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  const { data: events = [], isLoading, error, refetch } = useEvents(
+    date,
+    typeFilter || undefined
+  );
 
   function formatTime(iso: string): string {
     return iso.slice(11, 19);
@@ -79,12 +62,12 @@ export default function Events() {
       </div>
 
       {/* Content */}
-      {loading && <LoadingSpinner message="Loading events..." />}
-      {error && <ErrorMessage message={error} onRetry={fetchData} />}
-      {!loading && !error && events.length === 0 && (
+      {isLoading && <LoadingSpinner message="Loading events..." />}
+      {error && <ErrorMessage message={error instanceof Error ? error.message : "Failed to load events"} onRetry={() => refetch()} />}
+      {!isLoading && !error && events.length === 0 && (
         <div className="empty-state">No events recorded for {date}.</div>
       )}
-      {!loading && !error && events.length > 0 && (
+      {!isLoading && !error && events.length > 0 && (
         <div className="events-list">
           {events.map((evt) => (
             <div key={evt.sk} className="event-card">

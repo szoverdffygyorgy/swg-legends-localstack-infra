@@ -1,13 +1,14 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { createAlertRule } from "../api/client";
 import {
-  getAlertRules,
-  createAlertRule,
-  deleteAlertRule,
-  toggleAlertRule,
-  getAlertHistory,
-  getClassTree,
-} from "../api/client";
-import type { AlertRule, FiredAlert, ClassTreeNode } from "../api/types";
+  useAlertRules,
+  useAlertHistory,
+  useClassTree,
+  useCreateAlertRule,
+  useDeleteAlertRule,
+  useToggleAlertRule,
+} from "../api/hooks";
+import type { AlertRule, ClassTreeNode } from "../api/types";
 import { STAT_KEYS } from "../api/types";
 import LoadingSpinner from "../components/LoadingSpinner";
 import ErrorMessage from "../components/ErrorMessage";
@@ -54,31 +55,37 @@ function buildBreadcrumb(node: ClassTreeNode, nodeMap: Map<number, ClassTreeNode
 // ─── Component ───────────────────────────────────────────────────────
 
 export default function Alerts() {
-  const [rules, setRules] = useState<AlertRule[]>([]);
-  const [firedAlerts, setFiredAlerts] = useState<FiredAlert[]>([]);
-  const [classTree, setClassTree] = useState<ClassTreeNode[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // Data queries
+  const {
+    data: rules = [],
+    isLoading: rulesLoading,
+    error: rulesError,
+    refetch: refetchRules,
+  } = useAlertRules();
+  const {
+    data: firedAlerts = [],
+    isLoading: historyLoading,
+  } = useAlertHistory();
+  const { data: classTree = [] } = useClassTree();
+
+  // Mutations
+  const createMutation = useCreateAlertRule();
+  const deleteMutation = useDeleteAlertRule();
+  const toggleMutation = useToggleAlertRule();
+
+  const loading = rulesLoading || historyLoading;
+  const error = rulesError;
 
   // Create form state
   const [formName, setFormName] = useState("");
   const [formClass, setFormClass] = useState("");
   const [formThresholds, setFormThresholds] = useState<{ stat: string; min: string }[]>([]);
   const [formPlanets, setFormPlanets] = useState<string[]>([]);
-  const [creating, setCreating] = useState(false);
-  const [createError, setCreateError] = useState<string | null>(null);
 
   // Typeahead state
   const [typeaheadOpen, setTypeaheadOpen] = useState(false);
   const [typeaheadQuery, setTypeaheadQuery] = useState("");
   const typeaheadRef = useRef<HTMLDivElement>(null);
-
-  // Load class tree on mount
-  useEffect(() => {
-    getClassTree()
-      .then(setClassTree)
-      .catch((err) => console.warn("Failed to load class tree:", err));
-  }, []);
 
   // Build node map for breadcrumbs
   const nodeMap = useMemo(() => {
@@ -108,27 +115,6 @@ export default function Alerts() {
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
-
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [rulesData, historyData] = await Promise.all([
-        getAlertRules(),
-        getAlertHistory(),
-      ]);
-      setRules(rulesData.rules);
-      setFiredAlerts(historyData.alerts);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load alerts");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
 
   // ─── Form handlers ────────────────────────────────────────────────
 
@@ -173,60 +159,44 @@ export default function Alerts() {
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
-    setCreating(true);
-    setCreateError(null);
-    try {
-      // Build statThresholds map
-      const statThresholds: Record<string, number> = {};
-      for (const t of formThresholds) {
-        if (t.stat && t.min) {
-          statThresholds[t.stat] = Number(t.min);
-        }
+
+    // Build statThresholds map
+    const statThresholds: Record<string, number> = {};
+    for (const t of formThresholds) {
+      if (t.stat && t.min) {
+        statThresholds[t.stat] = Number(t.min);
       }
-
-      const body: Parameters<typeof createAlertRule>[0] = {
-        name: formName,
-        classPattern: formClass,
-      };
-
-      if (Object.keys(statThresholds).length > 0) {
-        body.statThresholds = statThresholds;
-      }
-      if (formPlanets.length > 0) {
-        body.planets = formPlanets;
-      }
-
-      await createAlertRule(body);
-
-      // Reset form
-      setFormName("");
-      setFormClass("");
-      setFormThresholds([]);
-      setFormPlanets([]);
-      await fetchData();
-    } catch (err) {
-      setCreateError(err instanceof Error ? err.message : "Failed to create rule");
-    } finally {
-      setCreating(false);
     }
+
+    const body: Parameters<typeof createAlertRule>[0] = {
+      name: formName,
+      classPattern: formClass,
+    };
+
+    if (Object.keys(statThresholds).length > 0) {
+      body.statThresholds = statThresholds;
+    }
+    if (formPlanets.length > 0) {
+      body.planets = formPlanets;
+    }
+
+    createMutation.mutate(body, {
+      onSuccess: () => {
+        // Reset form on success
+        setFormName("");
+        setFormClass("");
+        setFormThresholds([]);
+        setFormPlanets([]);
+      },
+    });
   }
 
-  async function handleDelete(ruleId: string) {
-    try {
-      await deleteAlertRule(ruleId);
-      await fetchData();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete rule");
-    }
+  function handleDelete(ruleId: string) {
+    deleteMutation.mutate(ruleId);
   }
 
-  async function handleToggle(ruleId: string) {
-    try {
-      await toggleAlertRule(ruleId);
-      await fetchData();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to toggle rule");
-    }
+  function handleToggle(ruleId: string) {
+    toggleMutation.mutate(ruleId);
   }
 
   function formatTime(iso: string): string {
@@ -234,7 +204,7 @@ export default function Alerts() {
   }
 
   if (loading) return <LoadingSpinner message="Loading alerts..." />;
-  if (error) return <ErrorMessage message={error} onRetry={fetchData} />;
+  if (error) return <ErrorMessage message={error instanceof Error ? error.message : "Failed to load alerts"} onRetry={() => refetchRules()} />;
 
   return (
     <div className="alerts-page">
@@ -376,10 +346,14 @@ export default function Alerts() {
 
           {/* Submit */}
           <div className="form-actions">
-            <button type="submit" className="btn-create" disabled={creating}>
-              {creating ? "Creating..." : "Create Rule"}
+            <button type="submit" className="btn-create" disabled={createMutation.isPending}>
+              {createMutation.isPending ? "Creating..." : "Create Rule"}
             </button>
-            {createError && <span className="form-error">{createError}</span>}
+            {createMutation.error && (
+              <span className="form-error">
+                {createMutation.error instanceof Error ? createMutation.error.message : "Failed to create rule"}
+              </span>
+            )}
           </div>
         </form>
       </div>

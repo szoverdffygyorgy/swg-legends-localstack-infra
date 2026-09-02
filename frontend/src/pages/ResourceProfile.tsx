@@ -1,11 +1,7 @@
-import { useState, useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getResourceProfile, getClassTree } from "../api/client";
-import type {
-  SingleResourceResponse,
-  SingleHistoryResponse,
-  ClassTreeNode,
-} from "../api/types";
+import { useResource, useHistoryResource, useClassTree } from "../api/hooks";
+import type { ClassTreeNode } from "../api/types";
 import { STAT_KEYS } from "../api/types";
 import StatBar from "../components/StatBar";
 import StatusBadge from "../components/StatusBadge";
@@ -60,38 +56,23 @@ export default function ResourceProfile() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  const [active, setActive] = useState<SingleResourceResponse | null>(null);
-  const [history, setHistory] = useState<SingleHistoryResponse | null>(null);
-  const [classTree, setClassTree] = useState<ClassTreeNode[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const activeQuery = useResource(id ?? "");
+  const historyQuery = useHistoryResource(id ?? "");
+  const classTreeQuery = useClassTree();
 
-  useEffect(() => {
-    if (!id) return;
+  const active = activeQuery.data ?? null;
+  const history = historyQuery.data ?? null;
+  const classTree = classTreeQuery.data ?? [];
 
-    setLoading(true);
-    setError(null);
+  // Still loading if either resource query is in initial load and hasn't errored
+  const loading =
+    (activeQuery.isLoading || historyQuery.isLoading) && !active && !history;
 
-    Promise.all([
-      getResourceProfile(id),
-      getClassTree(),
-    ])
-      .then(([profile, tree]) => {
-        setActive(profile.active);
-        setHistory(profile.history);
-        setClassTree(tree);
-
-        if (!profile.active && !profile.history) {
-          setError("Resource not found");
-        }
-      })
-      .catch((err) => {
-        setError(err instanceof Error ? err.message : "Failed to load resource");
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  }, [id]);
+  // Error only if BOTH queries failed (either could 404 legitimately)
+  const bothFailed = activeQuery.isError && historyQuery.isError;
+  const errorMessage = bothFailed
+    ? (activeQuery.error instanceof Error ? activeQuery.error.message : "Failed to load resource")
+    : null;
 
   // Derive the display data from whichever source is available (prefer active)
   const resource = useMemo(() => {
@@ -162,12 +143,15 @@ export default function ResourceProfile() {
     );
   }
 
-  if (error || !resource) {
+  if (errorMessage || !resource) {
     return (
       <div className="profile-page">
         <ErrorMessage
-          message={error ?? "Resource not found"}
-          onRetry={() => navigate(0)}
+          message={errorMessage ?? "Resource not found"}
+          onRetry={() => {
+            activeQuery.refetch();
+            historyQuery.refetch();
+          }}
         />
       </div>
     );

@@ -97,6 +97,22 @@
   background: var(--status-ok-bg);
 }
 
+/* ─── Background refresh indicator ────────────────────── */
+
+.refreshing-indicator {
+  color: var(--text-dim);
+  font-family: "Share Tech Mono", monospace;
+  font-size: 0.65rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  animation: pulse-dim 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse-dim {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
 /* ─── Sync summary ────────────────────────────────────── */
 
 .sync-summary {

@@ -1,6 +1,5 @@
-import { useState, useEffect } from "react";
 import { NavLink, Outlet } from "react-router-dom";
-import { getPipelineStatus } from "../api/client";
+import { usePipelineStatus } from "../api/hooks";
 import "./Layout.css";
 
 function timeAgo(isoDate: string): string {
@@ -22,22 +21,10 @@ function timeAgo(isoDate: string): string {
 }
 
 export default function Layout() {
-  const [syncTime, setSyncTime] = useState<string | null>(null);
-  const [syncStatus, setSyncStatus] = useState<string | null>(null);
+  const { data } = usePipelineStatus();
 
-  // Fetch pipeline status on every page navigation
-  useEffect(() => {
-    getPipelineStatus()
-      .then((data) => {
-        if (data.lastSync) {
-          setSyncTime(data.lastSync.syncedAt);
-          setSyncStatus(data.lastSync.status);
-        }
-      })
-      .catch(() => {
-        // Silently fail -- the indicator just won't show
-      });
-  }, []);
+  const syncTime = data?.lastSync?.syncedAt ?? null;
+  const syncStatus = data?.lastSync?.status ?? null;
 
   const syncIndicatorClass = syncStatus === "SUCCEEDED"
     ? "sync-indicator--ok"

@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { getHistory, getClassTree, getAlertRules, type HistoryFilters } from "../api/client";
-import type { HistoryResourceItem, ClassTreeNode, AlertRule, StatKey } from "../api/types";
+import { useHistory, useClassTree, useAlertRules } from "../api/hooks";
+import type { HistoryFilters } from "../api/client";
+import type { HistoryResourceItem, AlertRule, StatKey } from "../api/types";
 import { STAT_KEYS } from "../api/types";
 import { statQuality, qualityClass, rawValueClass } from "../utils/stats";
 import {
@@ -29,11 +30,6 @@ function formatDate(iso: string): string {
 
 export default function History() {
   const navigate = useNavigate();
-  const [resources, setResources] = useState<HistoryResourceItem[]>([]);
-  const [classTree, setClassTree] = useState<ClassTreeNode[]>([]);
-  const [alertRules, setAlertRules] = useState<AlertRule[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   // Filters
   const [classFilter, setClassFilter] = useState<string | null>(null);
@@ -56,15 +52,30 @@ export default function History() {
   const [sortKey, setSortKey] = useState<string>("despawnedAt");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
-  // Load class tree and alert rules on mount
-  useEffect(() => {
-    getClassTree()
-      .then(setClassTree)
-      .catch((err) => console.warn("Failed to load class tree:", err));
-    getAlertRules()
-      .then((data) => setAlertRules(data.rules))
-      .catch((err) => console.warn("Failed to load alert rules:", err));
-  }, []);
+  // Determine if any filter is active (filter-first behavior)
+  const hasActiveFilter = !!(classFilter || debouncedName || (stat && min));
+
+  // Build API filters from state
+  const filters: HistoryFilters = useMemo(() => {
+    const f: HistoryFilters = {};
+    if (classFilter) f.class = classFilter;
+    if (stat && min) {
+      f.stat = stat;
+      f.min = Number(min);
+    }
+    if (debouncedName) f.name = debouncedName;
+    return f;
+  }, [classFilter, stat, min, debouncedName]);
+
+  // Data queries
+  const { data: classTree = [] } = useClassTree();
+  const { data: alertRules = [] } = useAlertRules();
+  const {
+    data: resources = [],
+    isLoading,
+    error,
+    refetch,
+  } = useHistory(filters, hasActiveFilter);
 
   // Build stat caps lookup
   const statCapsMap = useMemo(() => {
@@ -80,7 +91,7 @@ export default function History() {
   // Resolve selected alert rule object
   const selectedAlert = useMemo(() => {
     if (!selectedAlertId) return null;
-    return alertRules.find((r) => r.ruleId === selectedAlertId) ?? null;
+    return alertRules.find((r: AlertRule) => r.ruleId === selectedAlertId) ?? null;
   }, [selectedAlertId, alertRules]);
 
   // When alert selection changes, update the class filter to match
@@ -90,7 +101,7 @@ export default function History() {
       setClassFilter(null);
       return;
     }
-    const rule = alertRules.find((r) => r.ruleId === alertId);
+    const rule = alertRules.find((r: AlertRule) => r.ruleId === alertId);
     if (rule) {
       setSelectedAlertId(alertId);
       setClassFilter(rule.classPattern);
@@ -103,43 +114,12 @@ export default function History() {
     setSelectedAlertId(null);
   }, []);
 
-  // Determine if any filter is active (filter-first behavior)
-  const hasActiveFilter = !!(classFilter || debouncedName || (stat && min));
-
-  const fetchData = useCallback(async () => {
-    if (!hasActiveFilter) {
-      setResources([]);
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    try {
-      const filters: HistoryFilters = {};
-      if (classFilter) filters.class = classFilter;
-      if (stat && min) {
-        filters.stat = stat;
-        filters.min = Number(min);
-      }
-      if (debouncedName) filters.name = debouncedName;
-      const data = await getHistory(filters);
-      setResources(data.resources);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load history");
-    } finally {
-      setLoading(false);
-    }
-  }, [classFilter, stat, min, debouncedName, hasActiveFilter]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
   // Pipeline: raw resources -> alert post-filter -> dedup -> sort
 
   // Step 1: Apply alert's stat thresholds and planet filter (if an alert is active)
   const alertFiltered = useMemo(() => {
     if (!selectedAlert) return resources;
-    return resources.filter((r) =>
+    return resources.filter((r: HistoryResourceItem) =>
       resourceMatchesAlert(r, getHistoryPlanets(r), selectedAlert)
     );
   }, [resources, selectedAlert]);
@@ -241,7 +221,7 @@ export default function History() {
               className={selectedAlertId ? "alert-active" : ""}
             >
               <option value="">No Alert</option>
-              {alertRules.map((rule) => (
+              {alertRules.map((rule: AlertRule) => (
                 <option key={rule.ruleId} value={rule.ruleId}>
                   {formatAlertLabel(rule)}
                 </option>
@@ -310,14 +290,14 @@ export default function History() {
             <p>Select a class, alert, or enter search criteria to find past resources.</p>
           </div>
         )}
-        {hasActiveFilter && loading && <LoadingSpinner message="Querying history..." />}
-        {hasActiveFilter && error && <ErrorMessage message={error} onRetry={fetchData} />}
-        {hasActiveFilter && !loading && !error && sorted.length === 0 && (
+        {hasActiveFilter && isLoading && <LoadingSpinner message="Querying history..." />}
+        {hasActiveFilter && error && <ErrorMessage message={error instanceof Error ? error.message : "Failed to load history"} onRetry={() => refetch()} />}
+        {hasActiveFilter && !isLoading && !error && sorted.length === 0 && (
           <div className="history-empty-state">
             <p>No past resources match the current filters.</p>
           </div>
         )}
-        {hasActiveFilter && !loading && !error && sorted.length > 0 && (
+        {hasActiveFilter && !isLoading && !error && sorted.length > 0 && (
           <div className="table-wrapper">
             <table className="data-table">
               <thead>

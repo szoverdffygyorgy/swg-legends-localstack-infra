@@ -155,25 +155,6 @@ export async function getHistoryById(
   return fetchJson<SingleHistoryResponse>(`${BASE}/history/${id}`);
 }
 
-/**
- * Fetch a resource profile by ID, checking both active and history tables
- * in parallel. Returns whichever (or both) have data.
- */
-export async function getResourceProfile(id: string): Promise<{
-  active: SingleResourceResponse | null;
-  history: SingleHistoryResponse | null;
-}> {
-  const [activeResult, historyResult] = await Promise.allSettled([
-    getResourceById(id),
-    getHistoryById(id),
-  ]);
-
-  return {
-    active: activeResult.status === "fulfilled" ? activeResult.value : null,
-    history: historyResult.status === "fulfilled" ? historyResult.value : null,
-  };
-}
-
 // ─── Ops ─────────────────────────────────────────────────────────────
 
 export async function getOpsDashboard(
@@ -189,18 +170,13 @@ export async function getOpsDashboard(
 
 // ─── Classification ──────────────────────────────────────────────────
 // Static resource class hierarchy. Served from /resource-class-tree.json
-// (Vite public/ in dev, S3 bucket in production). Fetched once and
-// cached in memory.
-
-let classTreeCache: ClassTreeNode[] | null = null;
+// (Vite public/ in dev, S3 bucket in production). Cached by TanStack Query
+// with staleTime: Infinity (see hooks.ts).
 
 export async function getClassTree(): Promise<ClassTreeNode[]> {
-  if (classTreeCache) return classTreeCache;
-
   const response = await fetch("/resource-class-tree.json");
   if (!response.ok) {
     throw new Error(`Failed to load class tree: ${response.status}`);
   }
-  classTreeCache = (await response.json()) as ClassTreeNode[];
-  return classTreeCache;
+  return (await response.json()) as ClassTreeNode[];
 }

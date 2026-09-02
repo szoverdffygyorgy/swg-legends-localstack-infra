@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { getResources, getClassTree, getAlertRules, type ResourceFilters } from "../api/client";
-import type { ResourceItem, ClassTreeNode, AlertRule, StatKey } from "../api/types";
+import { useResources, useClassTree, useAlertRules } from "../api/hooks";
+import type { ResourceFilters } from "../api/client";
+import type { ResourceItem, AlertRule, StatKey } from "../api/types";
 import { STAT_KEYS } from "../api/types";
 import { statQuality, qualityClass, rawValueClass } from "../utils/stats";
 import {
@@ -20,11 +21,6 @@ type SortDir = "asc" | "desc";
 
 export default function Resources() {
   const navigate = useNavigate();
-  const [resources, setResources] = useState<ResourceItem[]>([]);
-  const [classTree, setClassTree] = useState<ClassTreeNode[]>([]);
-  const [alertRules, setAlertRules] = useState<AlertRule[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   // Filters
   const [planet, setPlanet] = useState("");
@@ -39,15 +35,22 @@ export default function Resources() {
   const [sortKey, setSortKey] = useState<string>("oq");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
-  // Load class tree and alert rules on mount
-  useEffect(() => {
-    getClassTree()
-      .then(setClassTree)
-      .catch((err) => console.warn("Failed to load class tree:", err));
-    getAlertRules()
-      .then((data) => setAlertRules(data.rules))
-      .catch((err) => console.warn("Failed to load alert rules:", err));
-  }, []);
+  // Build API filters from state
+  const filters: ResourceFilters = useMemo(() => {
+    const f: ResourceFilters = {};
+    if (planet) f.planet = planet;
+    if (classFilter) f.class = classFilter;
+    if (stat && min) {
+      f.stat = stat;
+      f.min = Number(min);
+    }
+    return f;
+  }, [planet, classFilter, stat, min]);
+
+  // Data queries
+  const { data: classTree = [] } = useClassTree();
+  const { data: alertRules = [] } = useAlertRules();
+  const { data: resources = [], isLoading, error, refetch } = useResources(filters);
 
   // Build stat caps lookup
   const statCapsMap = useMemo(() => {
@@ -63,7 +66,7 @@ export default function Resources() {
   // Resolve selected alert rule object
   const selectedAlert = useMemo(() => {
     if (!selectedAlertId) return null;
-    return alertRules.find((r) => r.ruleId === selectedAlertId) ?? null;
+    return alertRules.find((r: AlertRule) => r.ruleId === selectedAlertId) ?? null;
   }, [selectedAlertId, alertRules]);
 
   // When alert selection changes, update the class filter to match
@@ -73,7 +76,7 @@ export default function Resources() {
       setClassFilter(null);
       return;
     }
-    const rule = alertRules.find((r) => r.ruleId === alertId);
+    const rule = alertRules.find((r: AlertRule) => r.ruleId === alertId);
     if (rule) {
       setSelectedAlertId(alertId);
       setClassFilter(rule.classPattern);
@@ -86,44 +89,20 @@ export default function Resources() {
     setSelectedAlertId(null); // manual class selection overrides alert
   }, []);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const filters: ResourceFilters = {};
-      if (planet) filters.planet = planet;
-      if (classFilter) filters.class = classFilter;
-      if (stat && min) {
-        filters.stat = stat;
-        filters.min = Number(min);
-      }
-      const data = await getResources(filters);
-      setResources(data.resources);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load resources");
-    } finally {
-      setLoading(false);
-    }
-  }, [planet, classFilter, stat, min]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
   // Pipeline: raw resources -> alert post-filter -> planet extraction -> dedup -> sort
 
   // Step 1: Apply alert's stat thresholds and planet filter (if an alert is active)
   const alertFiltered = useMemo(() => {
     if (!selectedAlert) return resources;
-    return resources.filter((r) => resourceMatchesAlert(r, getResourcePlanets(r), selectedAlert));
+    return resources.filter((r: ResourceItem) => resourceMatchesAlert(r, getResourcePlanets(r), selectedAlert));
   }, [resources, selectedAlert]);
 
   // Step 2: Extract unique planets for dropdown (from the alert-filtered set)
   const planets = useMemo(() => {
     const set = new Set<string>();
-    alertFiltered.forEach((r) => {
+    alertFiltered.forEach((r: ResourceItem) => {
       if (r.allPlanets) {
-        r.allPlanets.split(", ").forEach((p) => set.add(p));
+        r.allPlanets.split(", ").forEach((p: string) => set.add(p));
       } else {
         set.add(r.planet);
       }
@@ -227,7 +206,7 @@ export default function Resources() {
               className={selectedAlertId ? "alert-active" : ""}
             >
               <option value="">No Alert</option>
-              {alertRules.map((rule) => (
+              {alertRules.map((rule: AlertRule) => (
                 <option key={rule.ruleId} value={rule.ruleId}>
                   {formatAlertLabel(rule)}
                 </option>
@@ -291,9 +270,9 @@ export default function Resources() {
         </div>
 
         {/* Content */}
-        {loading && <LoadingSpinner message="Querying resources..." />}
-        {error && <ErrorMessage message={error} onRetry={fetchData} />}
-        {!loading && !error && (
+        {isLoading && <LoadingSpinner message="Querying resources..." />}
+        {error && <ErrorMessage message={error instanceof Error ? error.message : "Failed to load resources"} onRetry={() => refetch()} />}
+        {!isLoading && !error && (
           <div className="table-wrapper">
             <table className="data-table">
               <thead>
