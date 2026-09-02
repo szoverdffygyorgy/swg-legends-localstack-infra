@@ -135,3 +135,65 @@ export interface ClassTreeNode {
   isLeaf: boolean;
   statCaps: Partial<Record<StatKey, [number, number]>>;
 }
+
+// ─── Pipeline status ─────────────────────────────────────────────────
+
+export interface PipelineLastSync {
+  syncedAt: string;
+  status: string;
+  archiveS3Key: string;
+  spawnedCount: number;
+  despawnedCount: number;
+  unchangedCount: number;
+}
+
+export interface PipelineStep {
+  name: string;
+  status: "entered" | "succeeded" | "failed";
+}
+
+export interface PipelineExecution {
+  executionArn: string;
+  status: string;
+  startedAt: string | null;
+  stoppedAt: string | null;
+  duration: string | null;
+  steps: PipelineStep[];
+  output?: Record<string, unknown>;
+  error?: string;
+  cause?: string;
+}
+
+export interface PipelineStatusResponse {
+  lastSync: PipelineLastSync | null;
+  executions: PipelineExecution[];
+}
+
+// ─── Ops dashboard ───────────────────────────────────────────────────
+
+export interface LambdaMetric {
+  name: string;
+  invocations: number;
+  errors: number;
+}
+
+export interface QueueHealth {
+  name: string;
+  pending: number;
+  inFlight: number;
+  dlqMessages: number;
+}
+
+export interface LogEntry {
+  timestamp: number;
+  message: string;
+}
+
+export interface OpsDashboardResponse {
+  lastSync: PipelineLastSync | null;
+  executions: PipelineExecution[];
+  lambdaMetrics: LambdaMetric[];
+  queues: QueueHealth[];
+  recentLogs: LogEntry[];
+  logFunction: string;
+}

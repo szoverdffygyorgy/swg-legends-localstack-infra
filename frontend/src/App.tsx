@@ -3,6 +3,7 @@ import Layout from "./components/Layout";
 import Resources from "./pages/Resources";
 import Events from "./pages/Events";
 import Alerts from "./pages/Alerts";
+import Ops from "./pages/Ops";
 
 export default function App() {
   return (
@@ -11,6 +12,8 @@ export default function App() {
         <Route path="/resources" element={<Resources />} />
         <Route path="/events" element={<Events />} />
         <Route path="/alerts" element={<Alerts />} />
+        <Route path="/ops" element={<Ops />} />
+        <Route path="/pipeline" element={<Navigate to="/ops" replace />} />
         <Route path="*" element={<Navigate to="/resources" replace />} />
       </Route>
     </Routes>

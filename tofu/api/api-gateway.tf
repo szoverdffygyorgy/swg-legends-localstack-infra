@@ -71,6 +71,10 @@ resource "aws_api_gateway_rest_api" "swg_api" {
 #       ├── /alerts/rules
 #       │   └── /alerts/rules/{ruleId}
 #       └── /alerts/history
+#   └── /pipeline
+#       └── /pipeline/status
+#   └── /ops
+#       └── /ops/dashboard
 
 resource "aws_api_gateway_resource" "resources" {
   rest_api_id = aws_api_gateway_rest_api.swg_api.id
@@ -112,6 +116,30 @@ resource "aws_api_gateway_resource" "alerts_history" {
   rest_api_id = aws_api_gateway_rest_api.swg_api.id
   parent_id   = aws_api_gateway_resource.alerts.id
   path_part   = "history"
+}
+
+resource "aws_api_gateway_resource" "pipeline" {
+  rest_api_id = aws_api_gateway_rest_api.swg_api.id
+  parent_id   = aws_api_gateway_rest_api.swg_api.root_resource_id
+  path_part   = "pipeline"
+}
+
+resource "aws_api_gateway_resource" "pipeline_status" {
+  rest_api_id = aws_api_gateway_rest_api.swg_api.id
+  parent_id   = aws_api_gateway_resource.pipeline.id
+  path_part   = "status"
+}
+
+resource "aws_api_gateway_resource" "ops" {
+  rest_api_id = aws_api_gateway_rest_api.swg_api.id
+  parent_id   = aws_api_gateway_rest_api.swg_api.root_resource_id
+  path_part   = "ops"
+}
+
+resource "aws_api_gateway_resource" "ops_dashboard" {
+  rest_api_id = aws_api_gateway_rest_api.swg_api.id
+  parent_id   = aws_api_gateway_resource.ops.id
+  path_part   = "dashboard"
 }
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -254,6 +282,42 @@ resource "aws_api_gateway_integration" "get_alert_history" {
   uri                     = aws_lambda_function.api_alerts.invoke_arn
 }
 
+# ─── GET /pipeline/status ─────────────────────────────────────────────
+
+resource "aws_api_gateway_method" "get_pipeline_status" {
+  rest_api_id   = aws_api_gateway_rest_api.swg_api.id
+  resource_id   = aws_api_gateway_resource.pipeline_status.id
+  http_method   = "GET"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "get_pipeline_status" {
+  rest_api_id             = aws_api_gateway_rest_api.swg_api.id
+  resource_id             = aws_api_gateway_resource.pipeline_status.id
+  http_method             = aws_api_gateway_method.get_pipeline_status.http_method
+  type                    = "AWS_PROXY"
+  integration_http_method = "POST"
+  uri                     = aws_lambda_function.api_pipeline_status.invoke_arn
+}
+
+# ─── GET /ops/dashboard ───────────────────────────────────────────────
+
+resource "aws_api_gateway_method" "get_ops_dashboard" {
+  rest_api_id   = aws_api_gateway_rest_api.swg_api.id
+  resource_id   = aws_api_gateway_resource.ops_dashboard.id
+  http_method   = "GET"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "get_ops_dashboard" {
+  rest_api_id             = aws_api_gateway_rest_api.swg_api.id
+  resource_id             = aws_api_gateway_resource.ops_dashboard.id
+  http_method             = aws_api_gateway_method.get_ops_dashboard.http_method
+  type                    = "AWS_PROXY"
+  integration_http_method = "POST"
+  uri                     = aws_lambda_function.api_ops_dashboard.invoke_arn
+}
+
 # ═══════════════════════════════════════════════════════════════════════
 # DEPLOYMENT + STAGE
 # ═══════════════════════════════════════════════════════════════════════
@@ -293,6 +357,14 @@ resource "aws_api_gateway_deployment" "swg_api" {
       aws_api_gateway_integration.create_alert_rule.id,
       aws_api_gateway_integration.delete_alert_rule.id,
       aws_api_gateway_integration.get_alert_history.id,
+      aws_api_gateway_resource.pipeline.id,
+      aws_api_gateway_resource.pipeline_status.id,
+      aws_api_gateway_method.get_pipeline_status.id,
+      aws_api_gateway_integration.get_pipeline_status.id,
+      aws_api_gateway_resource.ops.id,
+      aws_api_gateway_resource.ops_dashboard.id,
+      aws_api_gateway_method.get_ops_dashboard.id,
+      aws_api_gateway_integration.get_ops_dashboard.id,
     ]))
   }
 
@@ -338,6 +410,22 @@ resource "aws_lambda_permission" "apigw_alerts" {
   statement_id  = "AllowAPIGatewayInvoke"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.api_alerts.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.swg_api.execution_arn}/*"
+}
+
+resource "aws_lambda_permission" "apigw_pipeline_status" {
+  statement_id  = "AllowAPIGatewayInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.api_pipeline_status.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.swg_api.execution_arn}/*"
+}
+
+resource "aws_lambda_permission" "apigw_ops_dashboard" {
+  statement_id  = "AllowAPIGatewayInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.api_ops_dashboard.function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_api_gateway_rest_api.swg_api.execution_arn}/*"
 }

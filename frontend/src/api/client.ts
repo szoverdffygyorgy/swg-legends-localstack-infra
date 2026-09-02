@@ -14,6 +14,8 @@ import type {
   CreateRuleResponse,
   AlertHistoryResponse,
   ClassTreeNode,
+  PipelineStatusResponse,
+  OpsDashboardResponse,
 } from "./types";
 
 // In dev mode (Vite proxy), /api is proxied to LocalStack API Gateway.
@@ -105,6 +107,23 @@ export async function deleteAlertRule(ruleId: string): Promise<void> {
 
 export async function getAlertHistory(): Promise<AlertHistoryResponse> {
   return fetchJson<AlertHistoryResponse>(`${BASE}/alerts/history`);
+}
+
+// ─── Pipeline ────────────────────────────────────────────────────────
+
+export async function getPipelineStatus(): Promise<PipelineStatusResponse> {
+  return fetchJson<PipelineStatusResponse>(`${BASE}/pipeline/status`);
+}
+
+export async function getOpsDashboard(
+  logFunction?: string
+): Promise<OpsDashboardResponse> {
+  const params = new URLSearchParams();
+  if (logFunction) params.set("logFunction", logFunction);
+  const qs = params.toString();
+  return fetchJson<OpsDashboardResponse>(
+    `${BASE}/ops/dashboard${qs ? `?${qs}` : ""}`
+  );
 }
 
 // ─── Classification ──────────────────────────────────────────────────

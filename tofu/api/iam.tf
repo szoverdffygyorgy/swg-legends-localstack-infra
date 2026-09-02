@@ -89,3 +89,71 @@ resource "aws_iam_role_policy" "api_lambda_logs" {
     ]
   })
 }
+
+# ─── Step Functions permissions ───────────────────────────────────────
+# The api-pipeline-status Lambda needs to read Step Functions execution
+# history to return pipeline run details.
+
+resource "aws_iam_role_policy" "api_lambda_stepfunctions" {
+  name = "api-lambda-stepfunctions-access"
+  role = aws_iam_role.api_lambda_execution.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "states:ListExecutions",
+          "states:DescribeExecution",
+          "states:GetExecutionHistory",
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+# ─── CloudWatch permissions ───────────────────────────────────────────
+# The api-ops-dashboard Lambda needs to read CloudWatch metrics and logs.
+
+resource "aws_iam_role_policy" "api_lambda_cloudwatch" {
+  name = "api-lambda-cloudwatch-access"
+  role = aws_iam_role.api_lambda_execution.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "cloudwatch:GetMetricData",
+          "cloudwatch:ListMetrics",
+          "logs:FilterLogEvents",
+          "logs:DescribeLogGroups",
+          "logs:DescribeLogStreams",
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+# ─── SQS permissions ─────────────────────────────────────────────────
+# The api-ops-dashboard Lambda needs to read SQS queue attributes.
+
+resource "aws_iam_role_policy" "api_lambda_sqs" {
+  name = "api-lambda-sqs-access"
+  role = aws_iam_role.api_lambda_execution.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["sqs:GetQueueAttributes"]
+        Resource = "arn:aws:sqs:${var.aws_region}:*:*"
+      }
+    ]
+  })
+}

@@ -66,7 +66,9 @@
     "backfill:classes": "tsx scripts/backfill-resource-classes.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-cloudwatch": "^3.1124.0",
     "@aws-sdk/client-cloudwatch-events": "^3.1121.0",
+    "@aws-sdk/client-cloudwatch-logs": "^3.1124.0",
     "@aws-sdk/client-dynamodb": "^3.0.0",
     "@aws-sdk/client-lambda": "^3.1121.0",
     "@aws-sdk/client-s3": "^3.0.0",
