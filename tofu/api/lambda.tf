@@ -11,6 +11,9 @@
 # 3. api-alerts — handles all /alerts/* endpoints
 #    Reads/writes the "alert-rules" DynamoDB table (messaging module).
 #
+# 4. api-get-history — handles GET /history
+#    Reads from the "resource-history" DynamoDB table (storage module).
+#
 # Like the compute module, we create the functions with a placeholder zip file.
 # The real code is deployed by scripts/build-lambdas.ts after running
 # `npm run lambda:build`.
@@ -167,5 +170,35 @@ resource "aws_lambda_function" "api_ops_dashboard" {
     Project = "swg-legends"
     Module  = "api"
     Purpose = "API: ops dashboard aggregation"
+  }
+}
+
+# ─── api-get-history ──────────────────────────────────────────────────
+# Handles GET /history
+# Queries the resource-history DynamoDB table with hierarchy-aware
+# class filtering (same GSI pattern as api-get-resources).
+
+resource "aws_lambda_function" "api_get_history" {
+  function_name = "api-get-history"
+  role          = aws_iam_role.api_lambda_execution.arn
+  handler       = "index.handler"
+  runtime       = "nodejs22.x"
+  filename      = data.archive_file.api_lambda_placeholder.output_path
+  timeout       = 30
+  memory_size   = 128
+
+  environment {
+    variables = {
+      LOCALSTACK_ENDPOINT    = "http://host.docker.internal:4566"
+      AWS_REGION_CUSTOM      = var.aws_region
+      RESOURCE_HISTORY_TABLE = "resource-history"
+      RESOURCE_CLASSES_TABLE = "resource-classes"
+    }
+  }
+
+  tags = {
+    Project = "swg-legends"
+    Module  = "api"
+    Purpose = "API: list historical (despawned) resources"
   }
 }

@@ -108,14 +108,16 @@ resource "aws_dynamodb_table" "resources" {
 }
 
 # ─── Resource history table ───────────────────────────────────────────
-# Will store past resource spawns for trend analysis.
-# Schema only for now -- we'll populate it in the messaging module when we build
-# the diff engine that detects spawn/despawn events.
+# Stores past resource spawns (despawned resources) for historical analysis.
+# Populated by the history-recorder Lambda when resources despawn.
 #
 # Primary key: resourceId (partition) + despawnedAt (sort)
 # - Partition by resource ID groups all history for one resource together
-# - Sort by despawn timestamp lets us query "most recent despawns" or
-#   "all spawns of resource X over time"
+# - Sort by despawn timestamp lets us query "all spawns of resource X over time"
+#
+# GSI by-category: same pattern as the resources table
+# - Enables hierarchy-aware class queries on historical data
+# - "Show me all past Copper resources" via begins_with on classPath
 
 resource "aws_dynamodb_table" "resource_history" {
   name         = "resource-history"
@@ -131,6 +133,30 @@ resource "aws_dynamodb_table" "resource_history" {
   attribute {
     name = "despawnedAt"
     type = "S" # ISO 8601 string (e.g., "2026-08-31T12:00:00Z")
+  }
+
+  # Used as partition key in the by-category GSI
+  # Top-level category: "Inorganic", "Organic", "Energy", "Space Resource"
+  attribute {
+    name = "classCategory"
+    type = "S"
+  }
+
+  # Used as sort key in the by-category GSI
+  # Materialized hierarchy path, e.g., "inorganic/mineral/metal/non-ferrous_metal/copper/desh_copper"
+  attribute {
+    name = "classPath"
+    type = "S"
+  }
+
+  # GSI: query by class hierarchy
+  # Mirrors the resources table's by-category GSI so the "Past Resources"
+  # page can use the same ClassTreePicker and hierarchy-aware filtering.
+  global_secondary_index {
+    name            = "by-category"
+    hash_key        = "classCategory"
+    range_key       = "classPath"
+    projection_type = "ALL"
   }
 
   tags = {

@@ -61,6 +61,9 @@ export default function Layout() {
           <NavLink to="/resources" className={navClass}>
             Resources
           </NavLink>
+          <NavLink to="/history" className={navClass}>
+            History
+          </NavLink>
           <NavLink to="/events" className={navClass}>
             Events
           </NavLink>

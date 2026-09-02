@@ -80,6 +80,7 @@ resource "aws_lambda_function" "history_recorder" {
       LOCALSTACK_ENDPOINT    = "http://host.docker.internal:4566"
       AWS_REGION_CUSTOM      = var.aws_region
       RESOURCE_HISTORY_TABLE = "resource-history"
+      RESOURCE_CLASSES_TABLE = "resource-classes"
     }
   }
 

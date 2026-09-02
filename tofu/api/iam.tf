@@ -42,7 +42,7 @@ resource "aws_iam_role" "api_lambda_execution" {
 # ─── DynamoDB permissions ─────────────────────────────────────────────
 # The API Lambdas need to read/write across tables from multiple modules:
 # - resources (storage module) — for GET /resources
-# - resource-history (storage module) — for future history endpoint
+# - resource-history (storage module) — for GET /history
 # - event-log (messaging module) — for GET /events
 # - alert-rules (messaging module) — for /alerts/* endpoints
 

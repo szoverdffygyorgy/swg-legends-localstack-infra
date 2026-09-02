@@ -35,6 +35,7 @@
 #   POST   /alerts/rules           → api-alerts Lambda
 #   DELETE /alerts/rules/{ruleId}  → api-alerts Lambda
 #   GET    /alerts/history         → api-alerts Lambda
+#   GET    /history                → api-get-history Lambda
 #
 # CORS is handled by each Lambda returning Access-Control-Allow-Origin
 # headers, plus OPTIONS methods for preflight requests.
@@ -75,6 +76,7 @@ resource "aws_api_gateway_rest_api" "swg_api" {
 #       └── /pipeline/status
 #   └── /ops
 #       └── /ops/dashboard
+#   └── /history
 
 resource "aws_api_gateway_resource" "resources" {
   rest_api_id = aws_api_gateway_rest_api.swg_api.id
@@ -140,6 +142,12 @@ resource "aws_api_gateway_resource" "ops_dashboard" {
   rest_api_id = aws_api_gateway_rest_api.swg_api.id
   parent_id   = aws_api_gateway_resource.ops.id
   path_part   = "dashboard"
+}
+
+resource "aws_api_gateway_resource" "history" {
+  rest_api_id = aws_api_gateway_rest_api.swg_api.id
+  parent_id   = aws_api_gateway_rest_api.swg_api.root_resource_id
+  path_part   = "history"
 }
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -318,6 +326,24 @@ resource "aws_api_gateway_integration" "get_ops_dashboard" {
   uri                     = aws_lambda_function.api_ops_dashboard.invoke_arn
 }
 
+# ─── GET /history ─────────────────────────────────────────────────────
+
+resource "aws_api_gateway_method" "get_history" {
+  rest_api_id   = aws_api_gateway_rest_api.swg_api.id
+  resource_id   = aws_api_gateway_resource.history.id
+  http_method   = "GET"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "get_history" {
+  rest_api_id             = aws_api_gateway_rest_api.swg_api.id
+  resource_id             = aws_api_gateway_resource.history.id
+  http_method             = aws_api_gateway_method.get_history.http_method
+  type                    = "AWS_PROXY"
+  integration_http_method = "POST"
+  uri                     = aws_lambda_function.api_get_history.invoke_arn
+}
+
 # ═══════════════════════════════════════════════════════════════════════
 # DEPLOYMENT + STAGE
 # ═══════════════════════════════════════════════════════════════════════
@@ -365,6 +391,9 @@ resource "aws_api_gateway_deployment" "swg_api" {
       aws_api_gateway_resource.ops_dashboard.id,
       aws_api_gateway_method.get_ops_dashboard.id,
       aws_api_gateway_integration.get_ops_dashboard.id,
+      aws_api_gateway_resource.history.id,
+      aws_api_gateway_method.get_history.id,
+      aws_api_gateway_integration.get_history.id,
     ]))
   }
 
@@ -426,6 +455,14 @@ resource "aws_lambda_permission" "apigw_ops_dashboard" {
   statement_id  = "AllowAPIGatewayInvoke"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.api_ops_dashboard.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.swg_api.execution_arn}/*"
+}
+
+resource "aws_lambda_permission" "apigw_get_history" {
+  statement_id  = "AllowAPIGatewayInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.api_get_history.function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_api_gateway_rest_api.swg_api.execution_arn}/*"
 }

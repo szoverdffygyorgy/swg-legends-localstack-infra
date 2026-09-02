@@ -63,7 +63,8 @@
     "tofu:apply:classification": "tofu -chdir=tofu/classification apply -auto-approve",
     "tofu:destroy:classification": "tofu -chdir=tofu/classification destroy -auto-approve",
     "seed:classes": "tsx scripts/seed-resource-classes.ts",
-    "backfill:classes": "tsx scripts/backfill-resource-classes.ts"
+    "backfill:classes": "tsx scripts/backfill-resource-classes.ts",
+    "backfill:history": "tsx scripts/backfill-resource-history.ts"
   },
   "dependencies": {
     "@aws-sdk/client-cloudwatch": "^3.1124.0",

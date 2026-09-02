@@ -13,6 +13,7 @@ import type {
   AlertRulesResponse,
   CreateRuleResponse,
   AlertHistoryResponse,
+  HistoryListResponse,
   ClassTreeNode,
   PipelineStatusResponse,
   OpsDashboardResponse,
@@ -114,6 +115,32 @@ export async function getAlertHistory(): Promise<AlertHistoryResponse> {
 export async function getPipelineStatus(): Promise<PipelineStatusResponse> {
   return fetchJson<PipelineStatusResponse>(`${BASE}/pipeline/status`);
 }
+
+// ─── History ─────────────────────────────────────────────────────────
+
+export interface HistoryFilters {
+  class?: string;
+  stat?: string;
+  min?: number;
+  name?: string;
+}
+
+export async function getHistory(
+  filters: HistoryFilters = {}
+): Promise<HistoryListResponse> {
+  const params = new URLSearchParams();
+  if (filters.class) params.set("class", filters.class);
+  if (filters.stat) params.set("stat", filters.stat);
+  if (filters.min !== undefined) params.set("min", String(filters.min));
+  if (filters.name) params.set("name", filters.name);
+
+  const qs = params.toString();
+  return fetchJson<HistoryListResponse>(
+    `${BASE}/history${qs ? `?${qs}` : ""}`
+  );
+}
+
+// ─── Ops ─────────────────────────────────────────────────────────────
 
 export async function getOpsDashboard(
   logFunction?: string

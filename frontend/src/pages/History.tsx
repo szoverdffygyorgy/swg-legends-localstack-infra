@@ -1,40 +1,57 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { getResources, getClassTree, getAlertRules, type ResourceFilters } from "../api/client";
-import type { ResourceItem, ClassTreeNode, AlertRule, StatKey } from "../api/types";
+import { getHistory, getClassTree, getAlertRules, type HistoryFilters } from "../api/client";
+import type { HistoryResourceItem, ClassTreeNode, AlertRule, StatKey } from "../api/types";
 import { STAT_KEYS } from "../api/types";
 import { statQuality, qualityClass, rawValueClass } from "../utils/stats";
 import {
   formatAlertLabel,
   resourceMatchesAlert,
-  getResourcePlanets,
+  getHistoryPlanets,
 } from "../utils/alerts";
 import ClassTreePicker from "../components/ClassTreePicker";
 import LoadingSpinner from "../components/LoadingSpinner";
 import ErrorMessage from "../components/ErrorMessage";
-import "./Resources.css";
+import "./History.css";
 
 type SortDir = "asc" | "desc";
 
+function formatDate(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 // ─── Component ───────────────────────────────────────────────────────
 
-export default function Resources() {
-  const [resources, setResources] = useState<ResourceItem[]>([]);
+export default function History() {
+  const [resources, setResources] = useState<HistoryResourceItem[]>([]);
   const [classTree, setClassTree] = useState<ClassTreeNode[]>([]);
   const [alertRules, setAlertRules] = useState<AlertRule[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Filters
-  const [planet, setPlanet] = useState("");
   const [classFilter, setClassFilter] = useState<string | null>(null);
   const [stat, setStat] = useState("");
   const [min, setMin] = useState("");
+  const [nameSearch, setNameSearch] = useState("");
 
   // Alert filter
   const [selectedAlertId, setSelectedAlertId] = useState<string | null>(null);
 
+  // Debounced name search (avoid firing API calls on every keystroke)
+  const [debouncedName, setDebouncedName] = useState("");
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedName(nameSearch), 300);
+    return () => clearTimeout(timer);
+  }, [nameSearch]);
+
   // Sort
-  const [sortKey, setSortKey] = useState<string>("oq");
+  const [sortKey, setSortKey] = useState<string>("despawnedAt");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
   // Load class tree and alert rules on mount
@@ -81,66 +98,63 @@ export default function Resources() {
   // When class tree is clicked directly, clear the alert selection
   const handleClassSelect = useCallback((className: string | null) => {
     setClassFilter(className);
-    setSelectedAlertId(null); // manual class selection overrides alert
+    setSelectedAlertId(null);
   }, []);
 
+  // Determine if any filter is active (filter-first behavior)
+  const hasActiveFilter = !!(classFilter || debouncedName || (stat && min));
+
   const fetchData = useCallback(async () => {
+    if (!hasActiveFilter) {
+      setResources([]);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
-      const filters: ResourceFilters = {};
-      if (planet) filters.planet = planet;
+      const filters: HistoryFilters = {};
       if (classFilter) filters.class = classFilter;
       if (stat && min) {
         filters.stat = stat;
         filters.min = Number(min);
       }
-      const data = await getResources(filters);
+      if (debouncedName) filters.name = debouncedName;
+      const data = await getHistory(filters);
       setResources(data.resources);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load resources");
+      setError(err instanceof Error ? err.message : "Failed to load history");
     } finally {
       setLoading(false);
     }
-  }, [planet, classFilter, stat, min]);
+  }, [classFilter, stat, min, debouncedName, hasActiveFilter]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  // Pipeline: raw resources -> alert post-filter -> planet extraction -> dedup -> sort
+  // Pipeline: raw resources -> alert post-filter -> dedup -> sort
 
   // Step 1: Apply alert's stat thresholds and planet filter (if an alert is active)
   const alertFiltered = useMemo(() => {
     if (!selectedAlert) return resources;
-    return resources.filter((r) => resourceMatchesAlert(r, getResourcePlanets(r), selectedAlert));
+    return resources.filter((r) =>
+      resourceMatchesAlert(r, getHistoryPlanets(r), selectedAlert)
+    );
   }, [resources, selectedAlert]);
 
-  // Step 2: Extract unique planets for dropdown (from the alert-filtered set)
-  const planets = useMemo(() => {
-    const set = new Set<string>();
-    alertFiltered.forEach((r) => {
-      if (r.allPlanets) {
-        r.allPlanets.split(", ").forEach((p) => set.add(p));
-      } else {
-        set.add(r.planet);
-      }
-    });
-    return [...set].sort();
-  }, [alertFiltered]);
-
-  // Step 3: Deduplicate by resourceId
+  // Step 2: Deduplicate by resourceId (keep most recent despawn)
   const deduped = useMemo(() => {
-    const seen = new Map<string, ResourceItem>();
+    const seen = new Map<string, HistoryResourceItem>();
     for (const r of alertFiltered) {
-      if (!seen.has(r.resourceId)) {
+      const existing = seen.get(r.resourceId);
+      if (!existing || r.despawnedAt > existing.despawnedAt) {
         seen.set(r.resourceId, r);
       }
     }
     return [...seen.values()];
   }, [alertFiltered]);
 
-  // Step 4: Sort
+  // Step 3: Sort
   const sorted = useMemo(() => {
     const mult = sortDir === "asc" ? 1 : -1;
     return [...deduped].sort((a, b) => {
@@ -172,7 +186,7 @@ export default function Resources() {
     return sortDir === "asc" ? " \u25B2" : " \u25BC";
   }
 
-  function renderStatCell(r: ResourceItem, statKey: StatKey) {
+  function renderStatCell(r: HistoryResourceItem, statKey: StatKey) {
     const val = r[statKey];
     if (val === undefined) {
       return (
@@ -203,9 +217,9 @@ export default function Resources() {
   }
 
   return (
-    <div className="resources-page">
+    <div className="history-page">
       {/* Sidebar: Class tree */}
-      <aside className="resources-sidebar">
+      <aside className="history-sidebar">
         <ClassTreePicker
           tree={classTree}
           selected={classFilter}
@@ -214,7 +228,7 @@ export default function Resources() {
       </aside>
 
       {/* Main content */}
-      <div className="resources-main">
+      <div className="history-main">
         {/* Filter bar */}
         <div className="filter-bar">
           <div className="filter-group filter-group--alert">
@@ -232,14 +246,14 @@ export default function Resources() {
               ))}
             </select>
           </div>
-          <div className="filter-group">
-            <label>Planet</label>
-            <select value={planet} onChange={(e) => setPlanet(e.target.value)}>
-              <option value="">All Planets</option>
-              {planets.map((p) => (
-                <option key={p} value={p}>{p}</option>
-              ))}
-            </select>
+          <div className="filter-group filter-group--name">
+            <label>Name</label>
+            <input
+              type="text"
+              placeholder="Search resource name..."
+              value={nameSearch}
+              onChange={(e) => setNameSearch(e.target.value)}
+            />
           </div>
           <div className="filter-group">
             <label>Stat</label>
@@ -263,7 +277,7 @@ export default function Resources() {
             />
           </div>
           <div className="filter-count">
-            <span className="count-value">{deduped.length}</span> resources
+            <span className="count-value">{deduped.length}</span> past resources
           </div>
         </div>
 
@@ -289,9 +303,19 @@ export default function Resources() {
         </div>
 
         {/* Content */}
-        {loading && <LoadingSpinner message="Querying resources..." />}
-        {error && <ErrorMessage message={error} onRetry={fetchData} />}
-        {!loading && !error && (
+        {!hasActiveFilter && (
+          <div className="history-empty-state">
+            <p>Select a class, alert, or enter search criteria to find past resources.</p>
+          </div>
+        )}
+        {hasActiveFilter && loading && <LoadingSpinner message="Querying history..." />}
+        {hasActiveFilter && error && <ErrorMessage message={error} onRetry={fetchData} />}
+        {hasActiveFilter && !loading && !error && sorted.length === 0 && (
+          <div className="history-empty-state">
+            <p>No past resources match the current filters.</p>
+          </div>
+        )}
+        {hasActiveFilter && !loading && !error && sorted.length > 0 && (
           <div className="table-wrapper">
             <table className="data-table">
               <thead>
@@ -315,12 +339,15 @@ export default function Resources() {
                       {s.toUpperCase()}{sortIndicator(s)}
                     </th>
                   ))}
+                  <th onClick={() => handleSort("despawnedAt")} className="sortable">
+                    Despawned{sortIndicator("despawnedAt")}
+                  </th>
                   <th>Reporter</th>
                 </tr>
               </thead>
               <tbody>
                 {sorted.map((r) => (
-                  <tr key={r.resourceId}>
+                  <tr key={`${r.resourceId}-${r.despawnedAt}`}>
                     <td className="cell-name">{r.resourceName}</td>
                     <td className="cell-class">{r.resourceClass}</td>
                     <td className="cell-category">
@@ -334,10 +361,11 @@ export default function Resources() {
                         <span className="category-label">{r.classCategory ?? "\u2014"}</span>
                       )}
                     </td>
-                    <td className="cell-planets" title={r.allPlanets || r.planet}>
-                      {r.allPlanets || r.planet}
+                    <td className="cell-planets" title={r.planets}>
+                      {r.planets}
                     </td>
                     {STAT_KEYS.map((s) => renderStatCell(r, s))}
+                    <td className="cell-despawned">{formatDate(r.despawnedAt)}</td>
                     <td className="cell-reporter">{r.availableBy}</td>
                   </tr>
                 ))}

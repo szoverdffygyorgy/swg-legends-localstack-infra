@@ -120,6 +120,45 @@ export const STAT_KEYS = [
 
 export type StatKey = (typeof STAT_KEYS)[number];
 
+// ─── Resource history ────────────────────────────────────────────────
+// Matches the api-get-history Lambda response shape.
+
+export interface HistoryResourceItem {
+  resourceId: string;
+  despawnedAt: string;
+  resourceName: string;
+  resourceClass: string;
+  resourceClassId: string;
+  planets: string;
+  classPath?: string;
+  classCategory?: string;
+  classGroup?: string;
+  availableTimestamp: number;
+  availableBy: string;
+  er?: number;
+  cr?: number;
+  cd?: number;
+  dr?: number;
+  fl?: number;
+  hr?: number;
+  ma?: number;
+  pe?: number;
+  oq?: number;
+  sr?: number;
+  ut?: number;
+}
+
+export interface HistoryListResponse {
+  count: number;
+  filters: {
+    class?: string;
+    stat?: string;
+    min?: number;
+    name?: string;
+  };
+  resources: HistoryResourceItem[];
+}
+
 // ─── Resource class hierarchy ────────────────────────────────────────
 // Matches the shape of entries in resource-class-tree.json (static data).
 
