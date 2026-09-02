@@ -11,6 +11,7 @@ import type {
   SingleResourceResponse,
   SingleHistoryResponse,
   EventListResponse,
+  AlertRule,
   AlertRulesResponse,
   CreateRuleResponse,
   AlertHistoryResponse,
@@ -105,6 +106,13 @@ export async function deleteAlertRule(ruleId: string): Promise<void> {
   await fetchJson<{ message: string }>(`${BASE}/alerts/rules/${ruleId}`, {
     method: "DELETE",
   });
+}
+
+export async function toggleAlertRule(ruleId: string): Promise<AlertRule> {
+  const result = await fetchJson<{ rule: AlertRule }>(`${BASE}/alerts/rules/${ruleId}`, {
+    method: "PUT",
+  });
+  return result.rule;
 }
 
 export async function getAlertHistory(): Promise<AlertHistoryResponse> {

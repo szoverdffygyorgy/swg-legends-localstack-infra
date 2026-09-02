@@ -3,12 +3,12 @@ import {
   getAlertRules,
   createAlertRule,
   deleteAlertRule,
+  toggleAlertRule,
   getAlertHistory,
   getClassTree,
 } from "../api/client";
 import type { AlertRule, FiredAlert, ClassTreeNode } from "../api/types";
 import { STAT_KEYS } from "../api/types";
-import StatusBadge from "../components/StatusBadge";
 import LoadingSpinner from "../components/LoadingSpinner";
 import ErrorMessage from "../components/ErrorMessage";
 import "./Alerts.css";
@@ -220,6 +220,15 @@ export default function Alerts() {
     }
   }
 
+  async function handleToggle(ruleId: string) {
+    try {
+      await toggleAlertRule(ruleId);
+      await fetchData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to toggle rule");
+    }
+  }
+
   function formatTime(iso: string): string {
     return iso.replace("T", " ").slice(0, 19);
   }
@@ -413,9 +422,13 @@ export default function Alerts() {
                         {formatPlanets(rule.planets)}
                       </td>
                       <td>
-                        <StatusBadge variant={rule.enabled ? "ok" : "warn"}>
+                        <button
+                          className={`btn-toggle ${rule.enabled ? "btn-toggle--enabled" : "btn-toggle--disabled"}`}
+                          onClick={() => handleToggle(rule.ruleId)}
+                          title={rule.enabled ? "Click to disable" : "Click to enable"}
+                        >
                           {rule.enabled ? "Enabled" : "Disabled"}
-                        </StatusBadge>
+                        </button>
                       </td>
                       <td className="cell-date">
                         {rule.createdAt ? formatTime(rule.createdAt) : "\u2014"}

@@ -330,6 +330,43 @@
   color: var(--bg-deep);
 }
 
+/* ─── Toggle button (enabled/disabled) ────────────────── */
+
+.btn-toggle {
+  background: transparent;
+  padding: 3px 10px;
+  font-family: inherit;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.btn-toggle--enabled {
+  color: var(--status-ok);
+  border: 1px solid var(--status-ok);
+}
+
+.btn-toggle--enabled:hover {
+  background: var(--status-ok);
+  color: var(--bg-deep);
+}
+
+.btn-toggle--disabled {
+  color: var(--status-warn);
+  border: 1px solid var(--status-warn);
+  opacity: 0.7;
+}
+
+.btn-toggle--disabled:hover {
+  background: var(--status-warn);
+  color: var(--bg-deep);
+  opacity: 1;
+}
+
 /* ─── Table overrides for alerts ──────────────────────── */
 
 .alerts-section .table-wrapper {

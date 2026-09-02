@@ -5,6 +5,7 @@
  *
  *   GET    /alerts/rules            -- list all alert rules
  *   POST   /alerts/rules            -- create a new alert rule
+ *   PUT    /alerts/rules/{ruleId}   -- toggle alert rule enabled/disabled
  *   DELETE /alerts/rules/{ruleId}   -- delete an alert rule
  *   GET    /alerts/history          -- list fired alert history
  *
@@ -36,6 +37,7 @@ import {
   QueryCommand,
   PutCommand,
   DeleteCommand,
+  UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
 
 // ─── Types ───────────────────────────────────────────────────────────
@@ -84,7 +86,7 @@ const CORS_HEADERS = {
   "Content-Type": "application/json",
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "Content-Type,Authorization",
-  "Access-Control-Allow-Methods": "GET,POST,DELETE,OPTIONS",
+  "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
 };
 
 // ─── JSON response helper ────────────────────────────────────────────
@@ -246,6 +248,50 @@ async function deleteRule(ruleId: string): Promise<APIGatewayProxyResult> {
   }
 }
 
+async function toggleRule(ruleId: string): Promise<APIGatewayProxyResult> {
+  try {
+    // Flip the enabled boolean using SET enabled = NOT enabled
+    // DynamoDB doesn't support NOT directly, so we use a two-step:
+    // read the current value, then update with the opposite.
+    const getResult = await docClient.send(
+      new QueryCommand({
+        TableName: tableName,
+        KeyConditionExpression: "pk = :pk AND sk = :sk",
+        ExpressionAttributeValues: { ":pk": "RULE", ":sk": ruleId },
+      })
+    );
+
+    const items = getResult.Items ?? [];
+    if (items.length === 0) {
+      return jsonResponse(404, { error: "Alert rule not found", ruleId });
+    }
+
+    const currentEnabled = items[0].enabled as boolean;
+    const newEnabled = !currentEnabled;
+
+    await docClient.send(
+      new UpdateCommand({
+        TableName: tableName,
+        Key: { pk: "RULE", sk: ruleId },
+        UpdateExpression: "SET #enabled = :val",
+        ExpressionAttributeNames: { "#enabled": "enabled" },
+        ExpressionAttributeValues: { ":val": newEnabled },
+      })
+    );
+
+    const rule = normalizeRule({ ...items[0], enabled: newEnabled });
+    return jsonResponse(200, {
+      message: `Alert rule ${newEnabled ? "enabled" : "disabled"}`,
+      rule,
+    });
+  } catch (err: unknown) {
+    if ((err as { name?: string }).name === "ConditionalCheckFailedException") {
+      return jsonResponse(404, { error: "Alert rule not found", ruleId });
+    }
+    throw err;
+  }
+}
+
 async function listFiredAlerts(): Promise<APIGatewayProxyResult> {
   const result = await docClient.send(
     new QueryCommand({
@@ -285,6 +331,11 @@ export async function handler(
     // DELETE /alerts/rules/{ruleId}
     if (method === "DELETE" && pathParams.ruleId) {
       return await deleteRule(pathParams.ruleId);
+    }
+
+    // PUT /alerts/rules/{ruleId} -- toggle enabled/disabled
+    if (method === "PUT" && pathParams.ruleId) {
+      return await toggleRule(pathParams.ruleId);
     }
 
     // POST /alerts/rules

@@ -34,6 +34,7 @@
 #   GET    /alerts/rules           → api-alerts Lambda
 #   POST   /alerts/rules           → api-alerts Lambda
 #   DELETE /alerts/rules/{ruleId}  → api-alerts Lambda
+#   PUT    /alerts/rules/{ruleId}  → api-alerts Lambda
 #   GET    /alerts/history         → api-alerts Lambda
 #   GET    /history                → api-get-history Lambda
 #   GET    /history/{id}           → api-get-history Lambda
@@ -280,6 +281,24 @@ resource "aws_api_gateway_integration" "delete_alert_rule" {
   uri                     = aws_lambda_function.api_alerts.invoke_arn
 }
 
+# ─── PUT /alerts/rules/{ruleId} ───────────────────────────────────────
+
+resource "aws_api_gateway_method" "toggle_alert_rule" {
+  rest_api_id   = aws_api_gateway_rest_api.swg_api.id
+  resource_id   = aws_api_gateway_resource.alerts_rules_by_id.id
+  http_method   = "PUT"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "toggle_alert_rule" {
+  rest_api_id             = aws_api_gateway_rest_api.swg_api.id
+  resource_id             = aws_api_gateway_resource.alerts_rules_by_id.id
+  http_method             = aws_api_gateway_method.toggle_alert_rule.http_method
+  type                    = "AWS_PROXY"
+  integration_http_method = "POST"
+  uri                     = aws_lambda_function.api_alerts.invoke_arn
+}
+
 # ─── GET /alerts/history ──────────────────────────────────────────────
 
 resource "aws_api_gateway_method" "get_alert_history" {
@@ -401,6 +420,7 @@ resource "aws_api_gateway_deployment" "swg_api" {
       aws_api_gateway_method.get_alert_rules.id,
       aws_api_gateway_method.create_alert_rule.id,
       aws_api_gateway_method.delete_alert_rule.id,
+      aws_api_gateway_method.toggle_alert_rule.id,
       aws_api_gateway_method.get_alert_history.id,
       aws_api_gateway_integration.get_resources.id,
       aws_api_gateway_integration.get_resource_by_id.id,
@@ -408,6 +428,7 @@ resource "aws_api_gateway_deployment" "swg_api" {
       aws_api_gateway_integration.get_alert_rules.id,
       aws_api_gateway_integration.create_alert_rule.id,
       aws_api_gateway_integration.delete_alert_rule.id,
+      aws_api_gateway_integration.toggle_alert_rule.id,
       aws_api_gateway_integration.get_alert_history.id,
       aws_api_gateway_resource.pipeline.id,
       aws_api_gateway_resource.pipeline_status.id,
