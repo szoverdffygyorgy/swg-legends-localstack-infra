@@ -4,7 +4,7 @@
 
 A local AWS infrastructure playground for learning AWS services by building a real, useful tool: a crafting and resource intelligence system for the Star Wars Galaxies (SWG) Legends server (NGE). All AWS services are emulated locally via LocalStack -- zero cloud costs.
 
-**All 8 modules are complete**, plus a React frontend. The system ingests real SWG resource data from swgaide.com, stores it in DynamoDB, publishes spawn/despawn events via SNS/SQS, evaluates hierarchy-aware alert rules via Lambda, exposes everything through a REST API (9+ endpoints), orchestrates the ingestion pipeline via Step Functions, schedules automatic runs via EventBridge, monitors health via CloudWatch, classifies all resources against a full 816-node class hierarchy, and presents it all in a browser-based React dashboard with a persistent class tree sidebar, ops monitoring, and alert-as-filter integration.
+**All 8 modules are complete**, plus a React frontend. The system ingests real SWG resource data from swgaide.com, stores it in DynamoDB, publishes spawn/despawn events via SNS/SQS, evaluates hierarchy-aware alert rules via Lambda, exposes everything through a REST API (12 endpoints), orchestrates the ingestion pipeline via Step Functions, schedules automatic runs via EventBridge, monitors health via CloudWatch, classifies all resources against a full 816-node class hierarchy, and presents it all in a browser-based React dashboard with a persistent class tree sidebar, resource profile pages with stat bar visualizations, historical resource browsing, ops monitoring, and alert-as-filter integration with enable/disable toggle.
 
 ## Decisions Made (Before Development)
 
@@ -91,7 +91,7 @@ Set up the local development environment: Docker Compose for LocalStack, OpenTof
 - **S3 bucket** (`swg-legends-raw-exports`): stores timestamped XML export archives
 - **DynamoDB tables:**
   - `resources` -- current spawns, denormalized (one item per resource-planet pair), with `by-planet` and `by-category` GSIs. Resources enriched with `classPath`, `classCategory`, `classGroup`.
-  - `resource-history` -- despawned resources with timestamps
+  - `resource-history` -- despawned resources with timestamps, enriched with classification fields (`classPath`, `classCategory`, `classGroup`) and flattened stats. Has `by-category` GSI mirroring the resources table for hierarchy-aware queries.
 - **Ingestion pipeline script** (`npm run ingest`): download, decompress, parse, diff, load, archive
 - **Query script** (`npm run query`): filter by planet, class, stat thresholds
 - **Bazaar Terminal HTML dashboard** (`npm run dashboard`): static HTML with sortable table, filters, event log, alert panels
@@ -116,7 +116,7 @@ Set up the local development environment: Docker Compose for LocalStack, OpenTof
 
 - **Lambda functions:**
   - `alert-evaluator` -- triggered by SQS, checks spawned resources against alert rules using hierarchy-aware class matching, writes FIRED items
-  - `history-recorder` -- triggered by SQS, writes despawned resources to resource-history table
+  - `history-recorder` -- triggered by SQS, enriches despawned resources with classification data (`classPath`, `classCategory`, `classGroup`) from the `resource-classes` table, flattens stats to top-level attributes for DynamoDB filtering, writes to resource-history table
 - **SQS → Lambda event source mappings:** auto-trigger on message arrival
 - **IAM roles and policies:** Lambda execution role with DynamoDB, SQS, CloudWatch Logs permissions
 - **Build system:** esbuild bundling + zip + deploy via `npm run lambda:build`
@@ -126,17 +126,20 @@ Set up the local development environment: Docker Compose for LocalStack, OpenTof
 ### API (API Gateway) -- COMPLETE
 **AWS Services:** API Gateway (REST API v1)
 
-- **REST API** with 9+ endpoints:
+- **REST API** with 12 endpoints:
   - `GET /resources` -- list with `?planet=`, `?category=`, `?stat=` + `?min=` filters
   - `GET /resources/{id}` -- specific resource by ID
+  - `GET /history` -- list past (despawned) resources with `?class=`, `?stat=` + `?min=`, `?name=` filters (hierarchy-aware, uses by-category GSI)
+  - `GET /history/{id}` -- specific despawned resource by ID (most recent despawn)
   - `GET /events` -- spawn/despawn events with `?date=` and `?type=` filters
   - `GET /alerts/rules` -- list alert rules
   - `POST /alerts/rules` -- create alert rule
+  - `PUT /alerts/rules/{ruleId}` -- toggle alert rule enabled/disabled
   - `DELETE /alerts/rules/{ruleId}` -- delete alert rule
   - `GET /alerts/history` -- fired alert history
   - `GET /pipeline/status` -- last sync time and pipeline execution info (used by header sync indicator)
   - `GET /ops/dashboard` -- aggregated ops data (DynamoDB, Step Functions, CloudWatch Metrics, SQS, CloudWatch Logs)
-- **5 Lambda functions** (domain-grouped): `api-get-resources`, `api-get-events`, `api-alerts`, `api-pipeline-status`, `api-ops-dashboard`
+- **6 Lambda functions** (domain-grouped): `api-get-resources`, `api-get-events`, `api-get-history`, `api-alerts`, `api-pipeline-status`, `api-ops-dashboard`
 - **Lambda proxy integration:** API Gateway passes full HTTP request to Lambda, Lambda returns full HTTP response
 - **CORS headers** on every Lambda response
 - **Smoke test suite** (`npm run api:test`): tests covering all endpoints, validation, error cases
@@ -184,18 +187,22 @@ Set up the local development environment: Docker Compose for LocalStack, OpenTof
 ### Frontend -- COMPLETE
 **Tech:** React 19, Vite 6, TypeScript, React Router 7
 
-- **4 pages:**
-  - **Resources** -- persistent class tree sidebar (816-node collapsible hierarchy with search), filterable/sortable table with stat quality % display using dual color scales (purple > blue > green > yellow > red for both raw values and quality %), resource deduplication, Category column, color legend, alert dropdown to apply configured alerts as filters
+- **6 pages:**
+  - **Resources** -- persistent class tree sidebar (816-node collapsible hierarchy with search), filterable/sortable table with stat quality % display using dual color scales (purple > blue > green > yellow > red for both raw values and quality %), resource deduplication, Category column, color legend, alert dropdown to apply configured alerts as filters. Clickable rows navigate to Resource Profile.
+  - **History** -- past (despawned) resources with class tree sidebar, alert preset dropdown, name search typeahead, stat threshold filters. Filter-first UX: page starts empty until a filter is active. Reuses ClassTreePicker component. Clickable rows navigate to Resource Profile.
+  - **Resource Profile** (`/resources/:id`) -- dedicated detail page with parallel fetch from active + history tables. Shows Available/Despawned status badge, full classification breadcrumb, planet chips, spawn/despawn dates, reporter. StatBar component visualizes each stat on a 0-1000 scale with highlighted cap range [min, max], filled value position, and 5-tier raw-value color coding (950+/900+/800+/500+/<500). Cap min/max labels shown below each bar.
   - **Events** -- date-based feed with type filters
-  - **Alerts** -- multi-threshold form (`statThresholds`), repeatable planet picker, class typeahead with hierarchy breadcrumbs, fired alert history
+  - **Alerts** -- multi-threshold form (`statThresholds`), repeatable planet picker, class typeahead with hierarchy breadcrumbs, clickable enable/disable toggle button (green "Enabled" / amber "Disabled"), fired alert history
   - **Ops** (replaces Pipeline) -- system health bar, pipeline execution history, Lambda metrics (24h), SQS queue health, CloudWatch log viewer with function dropdown and auto-refresh
-- **Header:** "Synced: Xh ago" indicator on every page (reads from `/pipeline/status`), 4 nav tabs: Resources, Events, Alerts, Ops
+- **Header:** "Synced: Xh ago" indicator on every page (reads from `/pipeline/status`), 5 nav tabs: Resources, History, Events, Alerts, Ops
+- **Shared utilities:** `utils/stats.ts` (stat quality display helpers), `utils/alerts.ts` (alert matching, label formatting, planet extraction) -- used by both Resources and History pages
+- **Components:** ClassTreePicker (sidebar), StatBar (cap range visualization), StatusBadge, LoadingSpinner, ErrorMessage
 - **SWG NGE color theme:** dark navy backgrounds, pale blue text, warm gold accents (CSS custom properties)
 - **Class tree JSON** served from S3 at runtime (not bundled); Vite proxies to S3 in dev
 - **Vite dev server** with API proxy to LocalStack API Gateway (`http://localhost:3000`)
 - **S3 static website hosting:** bucket `swg-legends-frontend` with public read policy
 - **Deploy script** (`npm run frontend:deploy`): builds React app with API URL baked in, uploads to S3
-- **Typed API client:** fetch wrapper matching all Lambda response shapes
+- **Typed API client:** fetch wrapper matching all Lambda response shapes, including `getResourceProfile()` (parallel active + history fetch via `Promise.allSettled`)
 
 ## Alert Rule Format
 
@@ -234,9 +241,9 @@ npm run alerts:add -- --name "Good Copper" --class Copper --stat oq:800 --stat s
 | DynamoDB | Resources, resource history, event log, alert rules, resource classes | Storage, Messaging, Classification |
 | SNS | Spawn/despawn event broadcasting, pipeline failure alerts | Messaging, Monitoring |
 | SQS | Message queuing with DLQs for reliable processing | Messaging |
-| Lambda | SQS consumers, API handlers, pipeline steps (15 total) | Compute, API, Orchestration |
+| Lambda | SQS consumers, API handlers, pipeline steps (16 total) | Compute, API, Orchestration |
 | IAM | Execution roles for Lambda, Step Functions, EventBridge | Compute, API, Orchestration, Monitoring |
-| API Gateway | REST API with 9+ HTTP endpoints | API |
+| API Gateway | REST API with 12 HTTP endpoints | API |
 | Step Functions | Ingestion pipeline orchestration (state machine) | Orchestration |
 | EventBridge | Scheduled pipeline execution, failure detection | Monitoring |
 | CloudWatch | Dashboard, metrics, alarms, logs | Monitoring |
@@ -245,12 +252,12 @@ npm run alerts:add -- --name "Good Copper" --class Copper --stat oq:800 --stat s
 
 | Resource | Count |
 |----------|-------|
-| Lambda functions | 15 (2 SQS-triggered, 5 API, 7 pipeline, 1 ops dashboard) |
+| Lambda functions | 16 (2 SQS-triggered, 6 API, 7 pipeline, 1 ops dashboard) |
 | DynamoDB tables | 5 (resources, resource-history, event-log, alert-rules, resource-classes) |
 | S3 buckets | 2 (raw-exports, frontend) |
 | SNS topics | 3 (resource-spawned, resource-despawned, pipeline-alerts) |
 | SQS queues | 4 (alert-evaluator, history-recorder + 2 DLQs) |
-| API Gateway endpoints | 9+ |
+| API Gateway endpoints | 12 |
 | Step Functions state machines | 1 (7 states + 2 terminal) |
 | EventBridge rules | 2 (schedule + failure detection) |
 | CloudWatch dashboards | 1 |
@@ -288,18 +295,21 @@ npm run ingest
 # 6. Backfill class metadata on resources (enriches classPath, classCategory, classGroup)
 npm run backfill:classes
 
-# 7. Upload class tree JSON to S3 (needed by frontend sidebar)
+# 7. Backfill history items with classification data (if history table has existing data)
+npm run backfill:history
+
+# 8. Upload class tree JSON to S3 (needed by frontend sidebar)
 # (check scripts or npm scripts for the exact upload command)
 
-# 8. Add alert rules (new format with multi-threshold + planet filter)
+# 9. Add alert rules (new format with multi-threshold + planet filter)
 npm run alerts:add -- --name "Good Copper" --class Copper --stat oq:800 --stat sr:400
 npm run alerts:add -- --name "Any Reactive Gas" --class "Reactive Gas"
 npm run alerts:add -- --name "Tatooine Metal" --class Metal --planet Tatooine
 
-# 9. Deploy frontend
+# 10. Deploy frontend
 npm run frontend:deploy
 
-# 10. Verify everything works
+# 11. Verify everything works
 npm run api:test           # API endpoint tests
 npm run pipeline:start     # Run the Step Functions pipeline
 npm run pipeline:status    # Check it succeeded
@@ -322,21 +332,59 @@ npm run frontend:dev       # Start React dev server at http://localhost:3000
 
 ## Possible Extensions
 
-These are natural next steps if the project continues:
+Prioritized backlog organized by learning value and feature impact.
 
-### High Value
-- **Schematics data + "best resource for schematic" endpoint** -- Parse SWGAide's `schematics_unity.xml.gz`, store crafting recipes with resource class requirements and stat weight profiles. Add `GET /schematics/{name}/best-resources` API endpoint. This was in the original plan but deferred. Now that the resource class hierarchy is fully modeled and integrated, schematics matching is unblocked.
+### Tier 1: High Value + New Infra Learning
 
-### Medium Value
-- **Ops endpoint caching / separation** -- The `/ops/dashboard` endpoint aggregates data from DynamoDB, Step Functions, CloudWatch Metrics, SQS, and CloudWatch Logs in a single call. Consider caching (ElastiCache or a DynamoDB cache record) or splitting into sub-endpoints for faster responses.
-- **Frontend improvements** -- Resource detail view (click a row to see full info), WebSocket for live event feed, dark/light theme toggle.
-- **Cognito (authentication)** -- Add user auth to the API Gateway. Each user gets their own alert rules. LocalStack support is limited but the concepts transfer to real AWS.
-- **DynamoDB Streams** -- React to DynamoDB changes in real-time instead of going through SNS. Alternative architecture worth understanding.
+These teach new AWS concepts while delivering meaningful features.
 
-### Educational / Comparative
-- **CI/CD pipeline** -- GitHub Actions to run `tofu plan`, `lambda:build`, `api:test`, and `frontend:deploy` on push. Would formalize the build and test workflow.
-- **Deploy to real AWS** -- The OpenTofu definitions are production-correct (modulo LocalStack workarounds). Deploying to a real AWS account would be a small step and would make CloudWatch dashboards, EventBridge schedules, and IAM policies actually functional.
-- **CloudFormation or CDK** -- Rewrite the IaC in AWS-native tooling for comparison with OpenTofu. See the tradeoffs firsthand.
+| Item | New Infra Learned | Feature Value |
+|------|-------------------|---------------|
+| **Schematics pipeline (phase 1: ingestion)** | Second data pipeline, new DynamoDB table design, multi-source ingestion. Parse SWGAide's `schematics_unity.xml.gz`. | Foundation for crafting helper. Now unblocked since the resource class hierarchy is fully modeled. |
+| **DynamoDB TTL (Time-To-Live)** | DynamoDB lifecycle management, automatic item expiration | Keeps event-log and history tables from growing unbounded |
+| **Resource notifications (SNS email)** | SNS email subscriptions, delivery mechanisms | Makes alerts actually *alert* you -- fired alerts trigger real emails |
+| **Lambda layers** | Lambda code sharing pattern | Cleans up duplicated classification cache loading across 4+ Lambdas |
+
+### Tier 2: High Feature Value, Familiar Infra
+
+These use patterns already learned but deliver strong user-facing results.
+
+| Item | Why |
+|------|-----|
+| **Schematics (phase 2: best resource endpoint)** | The payoff -- `GET /schematics/{name}/best-resources` applies stat weights to find optimal resources |
+| **Schematics (phase 3: profile page integration)** | "This resource is great for X, Y, Z schematics" section on the Resource Profile page |
+| **Crafting calculator page** | Select a schematic, see what active/historical resources would give the best results |
+| **Resource comparison** | On the Resource Profile page, show how this resource ranks against other active/past resources of the same class |
+| **Pagination** | Server-side pagination with DynamoDB cursor tokens (ExclusiveStartKey pattern) as data grows |
+
+### Tier 3: New Infra Concepts, Less Feature Impact
+
+Pure learning, less visible to a user but teaches important AWS patterns.
+
+| Item | What You Learn |
+|------|----------------|
+| **DynamoDB Streams** | Alternative event-driven architecture -- react to table changes instead of publishing to SNS explicitly |
+| **S3 lifecycle policies** | Storage cost management -- auto-transition old XML archives to Glacier or delete after N days |
+| **API Gateway caching** | API-level performance optimization on frequently-hit read endpoints without code changes |
+| **Cross-module OpenTofu state refs** | Production IaC patterns -- use `terraform_remote_state` or output references instead of hardcoded table names |
+| **Multi-environment support** | dev/staging/prod variable sets in OpenTofu -- same infra definitions, different resource names per environment |
+| **SQS FIFO queues** | Exactly-once vs at-least-once processing tradeoffs -- replace standard queues with FIFO |
+
+### Tier 4: DevOps / Educational
+
+Worth doing eventually, not urgent.
+
+| Item | What You Learn |
+|------|----------------|
+| **CI/CD pipeline** | GitHub Actions to run `tofu plan`, `lambda:build`, `api:test`, `frontend:deploy` on push |
+| **Deploy to real AWS** | Real cloud, real costs, real IAM -- OpenTofu definitions are production-correct |
+| **Infrastructure testing** | Terratest or `tofu plan` validation to catch drift between actual and expected state |
+| **WebSocket live events** | Real-time push for spawn/despawn events (may require paid LocalStack for API Gateway v2) |
+| **Dark/light theme toggle** | Pure frontend -- CSS custom properties are already in place, just needs a second value set + toggle |
+| **CSV/JSON export** | Download filtered resource lists or history data for external analysis |
+| **Unified search** | Cross-table search checking both active resources and history simultaneously |
+| **CloudFormation or CDK rewrite** | Rewrite the IaC in AWS-native tooling for comparison with OpenTofu |
+| **Cognito (authentication)** | User auth for per-user alert rules. LocalStack support is limited but the concepts transfer to real AWS |
 
 ## Important Notes
 
