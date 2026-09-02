@@ -36,6 +36,7 @@
 #   DELETE /alerts/rules/{ruleId}  → api-alerts Lambda
 #   GET    /alerts/history         → api-alerts Lambda
 #   GET    /history                → api-get-history Lambda
+#   GET    /history/{id}           → api-get-history Lambda
 #
 # CORS is handled by each Lambda returning Access-Control-Allow-Origin
 # headers, plus OPTIONS methods for preflight requests.
@@ -77,6 +78,7 @@ resource "aws_api_gateway_rest_api" "swg_api" {
 #   └── /ops
 #       └── /ops/dashboard
 #   └── /history
+#       └── /history/{id}
 
 resource "aws_api_gateway_resource" "resources" {
   rest_api_id = aws_api_gateway_rest_api.swg_api.id
@@ -148,6 +150,12 @@ resource "aws_api_gateway_resource" "history" {
   rest_api_id = aws_api_gateway_rest_api.swg_api.id
   parent_id   = aws_api_gateway_rest_api.swg_api.root_resource_id
   path_part   = "history"
+}
+
+resource "aws_api_gateway_resource" "history_by_id" {
+  rest_api_id = aws_api_gateway_rest_api.swg_api.id
+  parent_id   = aws_api_gateway_resource.history.id
+  path_part   = "{id}"
 }
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -344,6 +352,24 @@ resource "aws_api_gateway_integration" "get_history" {
   uri                     = aws_lambda_function.api_get_history.invoke_arn
 }
 
+# ─── GET /history/{id} ────────────────────────────────────────────────
+
+resource "aws_api_gateway_method" "get_history_by_id" {
+  rest_api_id   = aws_api_gateway_rest_api.swg_api.id
+  resource_id   = aws_api_gateway_resource.history_by_id.id
+  http_method   = "GET"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "get_history_by_id" {
+  rest_api_id             = aws_api_gateway_rest_api.swg_api.id
+  resource_id             = aws_api_gateway_resource.history_by_id.id
+  http_method             = aws_api_gateway_method.get_history_by_id.http_method
+  type                    = "AWS_PROXY"
+  integration_http_method = "POST"
+  uri                     = aws_lambda_function.api_get_history.invoke_arn
+}
+
 # ═══════════════════════════════════════════════════════════════════════
 # DEPLOYMENT + STAGE
 # ═══════════════════════════════════════════════════════════════════════
@@ -392,8 +418,11 @@ resource "aws_api_gateway_deployment" "swg_api" {
       aws_api_gateway_method.get_ops_dashboard.id,
       aws_api_gateway_integration.get_ops_dashboard.id,
       aws_api_gateway_resource.history.id,
+      aws_api_gateway_resource.history_by_id.id,
       aws_api_gateway_method.get_history.id,
+      aws_api_gateway_method.get_history_by_id.id,
       aws_api_gateway_integration.get_history.id,
+      aws_api_gateway_integration.get_history_by_id.id,
     ]))
   }
 

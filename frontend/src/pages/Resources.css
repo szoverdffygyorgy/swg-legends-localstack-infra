@@ -199,6 +199,10 @@
   transition: background var(--transition);
 }
 
+.data-table tbody tr.clickable-row {
+  cursor: pointer;
+}
+
 .data-table tbody tr:nth-child(even) {
   background: rgba(22, 32, 53, 0.5);
 }

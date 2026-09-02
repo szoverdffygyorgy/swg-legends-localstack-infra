@@ -9,6 +9,7 @@
 import type {
   ResourceListResponse,
   SingleResourceResponse,
+  SingleHistoryResponse,
   EventListResponse,
   AlertRulesResponse,
   CreateRuleResponse,
@@ -138,6 +139,31 @@ export async function getHistory(
   return fetchJson<HistoryListResponse>(
     `${BASE}/history${qs ? `?${qs}` : ""}`
   );
+}
+
+export async function getHistoryById(
+  id: string
+): Promise<SingleHistoryResponse> {
+  return fetchJson<SingleHistoryResponse>(`${BASE}/history/${id}`);
+}
+
+/**
+ * Fetch a resource profile by ID, checking both active and history tables
+ * in parallel. Returns whichever (or both) have data.
+ */
+export async function getResourceProfile(id: string): Promise<{
+  active: SingleResourceResponse | null;
+  history: SingleHistoryResponse | null;
+}> {
+  const [activeResult, historyResult] = await Promise.allSettled([
+    getResourceById(id),
+    getHistoryById(id),
+  ]);
+
+  return {
+    active: activeResult.status === "fulfilled" ? activeResult.value : null,
+    history: historyResult.status === "fulfilled" ? historyResult.value : null,
+  };
 }
 
 // ─── Ops ─────────────────────────────────────────────────────────────

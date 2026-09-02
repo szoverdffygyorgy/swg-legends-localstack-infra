@@ -1,0 +1,116 @@
+/* ─── StatBar layout ───────────────────────────────────── */
+
+.stat-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.stat-bar-label {
+  color: var(--accent-gold-dim);
+  font-weight: 600;
+  font-size: 0.75rem;
+  letter-spacing: 1px;
+  width: 28px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* ─── Bar track (0-1000 scale) ────────────────────────── */
+
+.stat-bar-track {
+  flex: 1;
+  height: 18px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  position: relative;
+  overflow: hidden;
+}
+
+/* ─── Cap range highlight ─────────────────────────────── */
+
+.stat-bar-range {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--bg-surface);
+  border-left: 1px solid var(--border-light);
+  border-right: 1px solid var(--border-light);
+}
+
+/* ─── Value fill within cap range ─────────────────────── */
+
+.stat-bar-fill {
+  height: 100%;
+  border-radius: 1px;
+  transition: width 300ms ease;
+}
+
+.stat-bar-fill.stat-bar--top {
+  background: var(--stat-top);
+  box-shadow: 0 0 8px rgba(176, 128, 224, 0.3);
+}
+
+.stat-bar-fill.stat-bar--high {
+  background: var(--stat-high);
+}
+
+.stat-bar-fill.stat-bar--fair {
+  background: var(--stat-fair);
+}
+
+.stat-bar-fill.stat-bar--mid {
+  background: var(--stat-mid);
+}
+
+.stat-bar-fill.stat-bar--low {
+  background: var(--stat-low);
+}
+
+/* ─── Value marker (thin line at exact position) ──────── */
+
+.stat-bar-marker {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  transform: translateX(-1px);
+}
+
+.stat-bar-marker.stat-bar--top { background: var(--stat-top); }
+.stat-bar-marker.stat-bar--high { background: var(--stat-high); }
+.stat-bar-marker.stat-bar--fair { background: var(--stat-fair); }
+.stat-bar-marker.stat-bar--mid { background: var(--stat-mid); }
+.stat-bar-marker.stat-bar--low { background: var(--stat-low); }
+
+/* ─── Value text ──────────────────────────────────────── */
+
+.stat-bar-value {
+  width: 90px;
+  text-align: right;
+  flex-shrink: 0;
+  font-family: "Share Tech Mono", monospace;
+  font-size: 0.85rem;
+}
+
+.stat-bar-number {
+  font-weight: 600;
+}
+
+.stat-bar-number.stat-bar--top {
+  color: var(--stat-top);
+  text-shadow: 0 0 6px rgba(176, 128, 224, 0.4);
+}
+
+.stat-bar-number.stat-bar--high { color: var(--stat-high); }
+.stat-bar-number.stat-bar--fair { color: var(--stat-fair); }
+.stat-bar-number.stat-bar--mid { color: var(--stat-mid); }
+.stat-bar-number.stat-bar--low { color: var(--stat-low); }
+
+.stat-bar-quality {
+  color: var(--text-dim);
+  font-size: 0.7rem;
+  margin-left: 4px;
+}

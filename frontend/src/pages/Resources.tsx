@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { getResources, getClassTree, getAlertRules, type ResourceFilters } from "../api/client";
 import type { ResourceItem, ClassTreeNode, AlertRule, StatKey } from "../api/types";
 import { STAT_KEYS } from "../api/types";
@@ -18,6 +19,7 @@ type SortDir = "asc" | "desc";
 // ─── Component ───────────────────────────────────────────────────────
 
 export default function Resources() {
+  const navigate = useNavigate();
   const [resources, setResources] = useState<ResourceItem[]>([]);
   const [classTree, setClassTree] = useState<ClassTreeNode[]>([]);
   const [alertRules, setAlertRules] = useState<AlertRule[]>([]);
@@ -320,7 +322,7 @@ export default function Resources() {
               </thead>
               <tbody>
                 {sorted.map((r) => (
-                  <tr key={r.resourceId}>
+                  <tr key={r.resourceId} className="clickable-row" onClick={() => navigate(`/resources/${r.resourceId}`)}>
                     <td className="cell-name">{r.resourceName}</td>
                     <td className="cell-class">{r.resourceClass}</td>
                     <td className="cell-category">

@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import Layout from "./components/Layout";
 import Resources from "./pages/Resources";
+import ResourceProfile from "./pages/ResourceProfile";
 import History from "./pages/History";
 import Events from "./pages/Events";
 import Alerts from "./pages/Alerts";
@@ -11,6 +12,7 @@ export default function App() {
     <Routes>
       <Route element={<Layout />}>
         <Route path="/resources" element={<Resources />} />
+        <Route path="/resources/:id" element={<ResourceProfile />} />
         <Route path="/history" element={<History />} />
         <Route path="/events" element={<Events />} />
         <Route path="/alerts" element={<Alerts />} />

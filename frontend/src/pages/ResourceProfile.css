@@ -1,0 +1,188 @@
+/* ─── Page layout ─────────────────────────────────────── */
+
+.profile-page {
+  max-width: 800px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding-bottom: 32px;
+}
+
+/* ─── Back button ─────────────────────────────────────── */
+
+.profile-back {
+  align-self: flex-start;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  padding: 6px 14px;
+  border-radius: var(--radius);
+  font-family: "Share Tech Mono", monospace;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: color var(--transition), border-color var(--transition);
+}
+
+.profile-back:hover {
+  color: var(--accent-cyan);
+  border-color: var(--border-focus);
+}
+
+/* ─── Header ──────────────────────────────────────────── */
+
+.profile-header {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.profile-title-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.profile-name {
+  color: var(--accent-cyan);
+  font-size: 1.6rem;
+  font-weight: 700;
+  margin: 0;
+  letter-spacing: 0.5px;
+}
+
+/* ─── Classification breadcrumb ───────────────────────── */
+
+.profile-breadcrumb {
+  font-size: 0.85rem;
+}
+
+.breadcrumb-sep {
+  color: var(--text-dim);
+  margin: 0 2px;
+}
+
+.breadcrumb-node {
+  color: var(--text-secondary);
+}
+
+.breadcrumb-leaf {
+  color: var(--accent-gold);
+  font-weight: 600;
+}
+
+/* ─── Meta info ───────────────────────────────────────── */
+
+.profile-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+}
+
+.meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.meta-label {
+  color: var(--text-dim);
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.meta-value {
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.meta-id {
+  color: var(--text-dim);
+  font-family: "Share Tech Mono", monospace;
+  font-size: 0.8rem;
+}
+
+.meta-planets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.planet-chip {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 2px 10px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+/* ─── Section ─────────────────────────────────────────── */
+
+.profile-section {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+}
+
+.section-title {
+  color: var(--accent-gold-dim);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin: 0 0 16px 0;
+}
+
+/* ─── Stats bars ──────────────────────────────────────── */
+
+.profile-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* ─── Plain stats (no caps available) ─────────────────── */
+
+.profile-stats-plain {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.stat-plain-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stat-plain-label {
+  color: var(--accent-gold-dim);
+  font-weight: 600;
+  font-size: 0.75rem;
+  letter-spacing: 1px;
+}
+
+.stat-plain-value {
+  color: var(--text-primary);
+  font-family: "Share Tech Mono", monospace;
+  font-size: 0.85rem;
+}
+
+/* ─── Empty state ─────────────────────────────────────── */
+
+.profile-empty {
+  color: var(--text-dim);
+  font-size: 0.9rem;
+}

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { getHistory, getClassTree, getAlertRules, type HistoryFilters } from "../api/client";
 import type { HistoryResourceItem, ClassTreeNode, AlertRule, StatKey } from "../api/types";
 import { STAT_KEYS } from "../api/types";
@@ -27,6 +28,7 @@ function formatDate(iso: string): string {
 // ─── Component ───────────────────────────────────────────────────────
 
 export default function History() {
+  const navigate = useNavigate();
   const [resources, setResources] = useState<HistoryResourceItem[]>([]);
   const [classTree, setClassTree] = useState<ClassTreeNode[]>([]);
   const [alertRules, setAlertRules] = useState<AlertRule[]>([]);
@@ -347,7 +349,7 @@ export default function History() {
               </thead>
               <tbody>
                 {sorted.map((r) => (
-                  <tr key={`${r.resourceId}-${r.despawnedAt}`}>
+                  <tr key={`${r.resourceId}-${r.despawnedAt}`} className="clickable-row" onClick={() => navigate(`/resources/${r.resourceId}`)}>
                     <td className="cell-name">{r.resourceName}</td>
                     <td className="cell-class">{r.resourceClass}</td>
                     <td className="cell-category">

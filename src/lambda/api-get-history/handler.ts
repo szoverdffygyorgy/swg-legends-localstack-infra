@@ -1,11 +1,12 @@
 /**
  * Lambda handler: API -- Get History
  *
- * Serves one endpoint via API Gateway REST API (v1):
+ * Serves two endpoints via API Gateway REST API (v1):
  *
- *   GET /history    -- list despawned (past) resources with optional filters
+ *   GET /history          -- list despawned (past) resources with optional filters
+ *   GET /history/{id}     -- get a specific despawned resource by ID
  *
- * Query parameters:
+ * Query parameters for GET /history:
  *   ?class=Copper           -- filter by class hierarchy (uses by-category GSI)
  *                              Matches the class itself AND all subclasses.
  *   ?stat=oq&min=800        -- filter by stat threshold
@@ -334,6 +335,7 @@ export async function handler(
   const method = event.httpMethod;
   const path = event.path;
   const params = event.queryStringParameters ?? {};
+  const pathParams = event.pathParameters ?? {};
 
   console.log(`API: ${method} ${path}`, JSON.stringify(params));
 
@@ -341,6 +343,48 @@ export async function handler(
   const cache = await loadClassCache();
 
   try {
+    // GET /history/{id} -- specific resource by ID
+    if (pathParams.id) {
+      const result = await docClient.send(
+        new QueryCommand({
+          TableName: tableName,
+          KeyConditionExpression: "resourceId = :id",
+          ExpressionAttributeValues: { ":id": pathParams.id },
+          ScanIndexForward: false, // most recent despawn first
+        })
+      );
+
+      const items = (result.Items ?? []) as HistoryItem[];
+      if (items.length === 0) {
+        return jsonResponse(404, {
+          error: "Resource not found in history",
+          resourceId: pathParams.id,
+        });
+      }
+
+      // Return the most recent despawn record as a single object
+      const first = items[0];
+      return jsonResponse(200, {
+        resourceId: first.resourceId,
+        resourceName: first.resourceName,
+        resourceClass: first.resourceClass,
+        resourceClassId: first.resourceClassId,
+        planets: first.planets ? first.planets.split(", ") : [],
+        availableTimestamp: first.availableTimestamp,
+        availableBy: first.availableBy,
+        classPath: first.classPath,
+        classCategory: first.classCategory,
+        classGroup: first.classGroup,
+        despawnedAt: first.despawnedAt,
+        stats: Object.fromEntries(
+          VALID_STATS
+            .filter((s) => (first as Record<string, unknown>)[s] !== undefined)
+            .map((s) => [s, (first as Record<string, unknown>)[s]])
+        ),
+      });
+    }
+
+    // GET /history -- list with filters
     const { class: resourceClass, stat, min, name: nameFilter } = params;
 
     // Validate stat filter

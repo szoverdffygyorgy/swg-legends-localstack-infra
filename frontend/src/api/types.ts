@@ -50,6 +50,21 @@ export interface SingleResourceResponse {
   classGroup?: string;
 }
 
+export interface SingleHistoryResponse {
+  resourceId: string;
+  resourceName: string;
+  resourceClass: string;
+  resourceClassId: string;
+  planets: string[];
+  availableTimestamp: number;
+  availableBy: string;
+  stats: Record<string, number>;
+  classPath?: string;
+  classCategory?: string;
+  classGroup?: string;
+  despawnedAt: string;
+}
+
 export interface EventLogItem {
   date: string;
   sk: string;
