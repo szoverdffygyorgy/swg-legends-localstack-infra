@@ -49,17 +49,14 @@ export default function StatBar({ statKey, value, capMin, capMax }: StatBarProps
           className="stat-bar-range"
           style={{ left: `${rangeLeft}%`, width: `${rangeWidth}%` }}
         >
+          <span className="stat-bar-cap stat-bar-cap--min">{capMin}</span>
+          <span className="stat-bar-cap stat-bar-cap--max">{capMax}</span>
           {/* Value fill within the cap range */}
           <div
             className={`stat-bar-fill ${tier}`}
             style={{ width: `${fillPercent}%` }}
           />
         </div>
-        {/* Value marker */}
-        <div
-          className={`stat-bar-marker ${tier}`}
-          style={{ left: `${(value / 1000) * 100}%` }}
-        />
       </div>
       <span className="stat-bar-value">
         <span className={`stat-bar-number ${tier}`}>{value}</span>

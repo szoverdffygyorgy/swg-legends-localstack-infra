@@ -26,7 +26,8 @@
   border: 1px solid var(--border);
   border-radius: var(--radius);
   position: relative;
-  overflow: hidden;
+  overflow: visible;
+  margin-bottom: 10px;
 }
 
 /* ─── Cap range highlight ─────────────────────────────── */
@@ -38,6 +39,26 @@
   background: var(--bg-surface);
   border-left: 1px solid var(--border-light);
   border-right: 1px solid var(--border-light);
+}
+
+/* ─── Cap range min/max labels ────────────────────────── */
+
+.stat-bar-cap {
+  position: absolute;
+  top: 100%;
+  font-size: 0.55rem;
+  color: var(--text-dim);
+  font-family: "Share Tech Mono", monospace;
+  margin-top: 2px;
+  line-height: 1;
+}
+
+.stat-bar-cap--min {
+  left: 0;
+}
+
+.stat-bar-cap--max {
+  right: 0;
 }
 
 /* ─── Value fill within cap range ─────────────────────── */
@@ -68,22 +89,6 @@
 .stat-bar-fill.stat-bar--low {
   background: var(--stat-low);
 }
-
-/* ─── Value marker (thin line at exact position) ──────── */
-
-.stat-bar-marker {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  transform: translateX(-1px);
-}
-
-.stat-bar-marker.stat-bar--top { background: var(--stat-top); }
-.stat-bar-marker.stat-bar--high { background: var(--stat-high); }
-.stat-bar-marker.stat-bar--fair { background: var(--stat-fair); }
-.stat-bar-marker.stat-bar--mid { background: var(--stat-mid); }
-.stat-bar-marker.stat-bar--low { background: var(--stat-low); }
 
 /* ─── Value text ──────────────────────────────────────── */
 
