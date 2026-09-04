@@ -355,6 +355,10 @@ These use patterns already learned but deliver strong user-facing results.
 | **Crafting calculator page** | Partially addressed by Schematic Profile. Full calculator would add multi-slot optimization. |
 | **Resource comparison** | On the Resource Profile page, show how this resource ranks against other active/past resources of the same class |
 | **Pagination** | Server-side pagination with DynamoDB cursor tokens (ExclusiveStartKey pattern) as data grows |
+| **"My Schematics" watchlist** | Pin schematics you actively craft. Dashboard shows best current resources for pinned schematics. New DynamoDB table for user preferences. |
+| **Alert enrichment with schematic scores** | When alert fires, compute scores against matching schematics. Show "score 920 for Advanced Composite Armor" instead of just "OQ: 850". |
+| **"Best ever" leaderboard** | Per resource class, track highest-scoring resource ever seen. Resource Profile shows "#3 best Desh Copper ever recorded." |
+| **Harvest planner** | Given pinned schematics, prioritized harvest list accounting for resource overlap across recipes. |
 
 ### Tier 3: New Infra Concepts, Less Feature Impact
 
@@ -375,14 +379,19 @@ Worth doing eventually, not urgent.
 
 | Item | What You Learn |
 |------|----------------|
-| **CI/CD pipeline** | GitHub Actions to run `tofu plan`, `lambda:build`, `api:test`, `frontend:deploy` on push |
-| **Deploy to real AWS** | Real cloud, real costs, real IAM -- OpenTofu definitions are production-correct |
+| **CI/CD pipeline** | GitHub Actions with LocalStack in Docker for testing, conditional deploys. See handoff.md "CI/CD Detail" for full breakdown. |
+| **Deploy to real AWS** | Real cloud, real costs (~$0-3/mo personal), real IAM. See handoff.md "Deploy to Real AWS Detail" for steps and cost estimates. |
 | **Infrastructure testing** | Terratest or `tofu plan` validation to catch drift between actual and expected state |
 | **WebSocket live events** | Real-time push for spawn/despawn events (may require paid LocalStack for API Gateway v2) |
 | **Dark/light theme toggle** | Pure frontend -- CSS custom properties are already in place, just needs a second value set + toggle |
 | **CSV/JSON export** | Download filtered resource lists or history data for external analysis |
 | **Unified search** | Cross-table search checking both active resources and history simultaneously |
 | **CloudFormation or CDK rewrite** | Rewrite the IaC in AWS-native tooling for comparison with OpenTofu |
+| **Cognito (authentication)** | User auth for per-user alert rules. LocalStack support is limited but concepts transfer to real AWS |
+
+### Suggested Learning Path
+
+Recommended order for next sessions: **DynamoDB TTL** (quick win, new concept) -> **CI/CD pipeline** (GitHub Actions, practical skill) -> **Deploy to real AWS** (ultimate validation, ~$0-3/mo) -> **Lambda layers** (code hygiene) -> **SNS email** (real alerts). Then feature work (watchlist, harvest planner) when actively playing SWG.
 
 ## Known LocalStack Limitations
 

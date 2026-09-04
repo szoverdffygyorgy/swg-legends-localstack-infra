@@ -419,6 +419,10 @@ These use patterns already learned but deliver strong user-facing results.
 | **Crafting calculator page** | Partially addressed by Schematic Profile's "Best Current Resources" section. A full calculator would add multi-slot optimization (finding the best resource *combination* across all ingredient slots). |
 | **Resource comparison** | On the Resource Profile page, show how this resource ranks against other active/past resources of the same class |
 | **Pagination** | Server-side pagination with DynamoDB cursor tokens (ExclusiveStartKey pattern) as data grows |
+| **"My Schematics" watchlist** | Pin schematics you actively craft. Dashboard shows best current resources for your pinned schematics. When resources spawn, immediately see if they matter. Needs a new DynamoDB table for user preferences. |
+| **Alert enrichment with schematic scores** | When an alert fires, compute scores against matching schematics. Fired alert shows "score 920 for Advanced Composite Armor" instead of just "OQ: 850". Extends existing alert-evaluator Lambda. |
+| **"Best ever" leaderboard** | Per resource class, track the highest-scoring resource ever seen from history. Resource Profile shows "#3 best Desh Copper ever recorded." Aggregate query on history table. |
+| **Harvest planner** | Given pinned schematics, show a prioritized harvest list: "Harvest these resources, in this order, from these planets." Accounts for resource overlap across schematics (one resource serving multiple recipes). |
 
 ### Tier 3: New Infra Concepts, Less Feature Impact
 
@@ -439,8 +443,8 @@ Worth doing eventually, not urgent.
 
 | Item | What You Learn |
 |------|----------------|
-| **CI/CD pipeline** | GitHub Actions to run `tofu plan`, `lambda:build`, `api:test`, `frontend:deploy` on push |
-| **Deploy to real AWS** | Real cloud, real costs, real IAM -- OpenTofu definitions are production-correct |
+| **CI/CD pipeline** | GitHub Actions with LocalStack in Docker for testing, conditional deploys. See "CI/CD Detail" section below. |
+| **Deploy to real AWS** | Real cloud, real costs, real IAM. See "Deploy to Real AWS Detail" section below. |
 | **Infrastructure testing** | Terratest or `tofu plan` validation to catch drift between actual and expected state |
 | **WebSocket live events** | Real-time push for spawn/despawn events (may require paid LocalStack for API Gateway v2) |
 | **Dark/light theme toggle** | Pure frontend -- CSS custom properties are already in place, just needs a second value set + toggle |
@@ -448,6 +452,65 @@ Worth doing eventually, not urgent.
 | **Unified search** | Cross-table search checking both active resources and history simultaneously |
 | **CloudFormation or CDK rewrite** | Rewrite the IaC in AWS-native tooling for comparison with OpenTofu |
 | **Cognito (authentication)** | User auth for per-user alert rules. LocalStack support is limited but the concepts transfer to real AWS |
+
+### CI/CD Detail
+
+A useful CI/CD pipeline for this project, using GitHub Actions:
+
+**On PR / push to main (validate):**
+- TypeScript type check (backend `tsc` + frontend `tsc`)
+- Frontend Vite production build
+- Lambda build (esbuild bundle all 17 functions)
+- API smoke tests against LocalStack in CI (spin up LocalStack via Docker Compose, run `tofu apply`, seed data, run `api:test`)
+
+**On merge to main (deploy, if targeting real AWS):**
+- `tofu plan` + `tofu apply` for changed modules
+- `lambda:build` (rebuild + deploy Lambdas)
+- `frontend:deploy` (build + upload to S3)
+- Conditional: `schematics:seed` if schematics data changed
+
+**What you learn:**
+- GitHub Actions workflow syntax (jobs, steps, matrix, conditions)
+- Docker Compose in CI (LocalStack as a service container)
+- Secrets management (AWS credentials, LocalStack auth token via GitHub Secrets)
+- Artifact caching (npm dependencies, Docker images)
+- Conditional deploy steps (only deploy on main, only seed if data changed)
+- Status checks on PRs (block merge if tests fail)
+
+### Deploy to Real AWS Detail
+
+The OpenTofu definitions are already production-correct. The main work:
+
+1. **Remove LocalStack-specific config** -- endpoint URLs in provider config, `NODE_TLS_REJECT_UNAUTHORIZED=0` hack in pipeline Lambdas
+2. **Set up AWS credentials** -- IAM user with programmatic access, or AWS SSO. Store in `~/.aws/credentials` or environment variables.
+3. **Point OpenTofu at real AWS** -- remove the `endpoints {}` block from the provider, set real region
+4. **Run the full provisioning chain** -- same `tofu init && tofu apply` for each module
+5. **Seed data** -- `seed:classes`, `schematics:seed`, run pipeline for initial resource load
+6. **Optional: CloudFront + custom domain** -- CDN for the frontend S3 bucket, Route53 for DNS. Adds ~$1/mo.
+7. **Optional: Cognito** -- user auth if building a community tool. Adds complexity but enables per-user preferences (watchlists, alerts).
+
+**Estimated monthly cost:**
+
+| Scenario | Cost |
+|----------|------|
+| Personal use, within AWS free tier (first 12 months) | **$0-3/month** |
+| Personal use, after free tier expires | **$5-10/month** |
+| Community tool (~50 users) | **$10-25/month** |
+| Community tool (~500 users) | **$25-75/month** |
+
+Key cost drivers at scale: API Gateway ($3.50/1M requests), DynamoDB (scales with read/write ops), CloudWatch dashboards ($3/mo fixed).
+
+## Suggested Learning Path
+
+Recommended order for the next sessions, balancing new AWS concepts with practical value:
+
+1. **DynamoDB TTL** -- Quick win, new AWS concept, keeps event-log and history tables bounded. ~1 session.
+2. **CI/CD pipeline** -- GitHub Actions with LocalStack in Docker. Practical skill for any project. Validates the full build + test chain. ~1-2 sessions.
+3. **Deploy to real AWS** -- Ultimate validation of everything built. Teaches real IAM, real costs, the local-to-cloud gap. ~$0-3/mo. ~1 session.
+4. **Lambda layers** -- Code hygiene, production pattern. Cleans up duplicated classification cache across 5+ Lambdas. ~1 session.
+5. **SNS email notifications** -- Makes alerts real. Pairs well with real AWS deployment (LocalStack email support is limited). ~1 session.
+
+After these, pivot to feature work (watchlist, harvest planner, alert enrichment) when actively playing SWG again -- at that point you'll have a real AWS deployment and can use the tool on your phone while playing.
 
 ## Important Notes
 
