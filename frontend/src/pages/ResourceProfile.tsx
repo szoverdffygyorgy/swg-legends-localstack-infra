@@ -201,11 +201,18 @@ export default function ResourceProfile() {
   const filteredSchematicCount = useMemo(() => {
     return schematics.filter((s) => {
       if (!showPrecu && s.base === "precu") return false;
-      // For the header count, we include low-score items regardless of toggle
-      // since the toggle only affects visibility within groups
+      if (!showLowScores) {
+        const expGroups = s.experimentalGroups ?? [];
+        const isLq = s.quality === "lq";
+        const hasExp = expGroups.length > 0;
+        if (hasExp && !isLq) {
+          const score = computeOverallScore(flatStats, expGroups);
+          if (score < 500) return false;
+        }
+      }
       return true;
     }).length;
-  }, [schematics, showPrecu]);
+  }, [schematics, showPrecu, showLowScores, flatStats]);
 
   if (loading) {
     return (
@@ -232,7 +239,7 @@ export default function ResourceProfile() {
   return (
     <div className="profile-page">
       {/* Back button */}
-      <button className="profile-back" onClick={() => navigate(-1)}>
+      <button className="profile-back" onClick={() => window.history.length > 1 ? navigate(-1) : navigate("/resources")}>
         &larr; Back
       </button>
 
@@ -290,7 +297,7 @@ export default function ResourceProfile() {
 
       {/* Stats section */}
       <div className="profile-section">
-        <h2 className="section-title">Stats</h2>
+        <h2 className="profile-section-title">Stats</h2>
         {statsWithCaps.length > 0 && (
           <div className="profile-stats">
             {statsWithCaps.map(({ key, value, capMin, capMax }) => (
@@ -321,7 +328,7 @@ export default function ResourceProfile() {
 
       {/* Used In Schematics section */}
       <div className="profile-section">
-        <h2 className="section-title">
+        <h2 className="profile-section-title">
           Used In Schematics
           {schematics.length > 0 && (
             <span className="schematics-count">{filteredSchematicCount}</span>

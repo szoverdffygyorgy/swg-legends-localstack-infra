@@ -6,18 +6,23 @@ interface ClassTreePickerProps {
   tree: ClassTreeNode[];
   selected: string | null;
   onSelect: (className: string | null) => void;
+  /** Optional map of className -> actual resource count. When provided,
+   *  the tree displays aggregated resource counts instead of static leaf type counts. */
+  resourceCounts?: Map<string, number>;
 }
 
 interface TreeNodeData {
   node: ClassTreeNode;
   children: TreeNodeData[];
   leafCount: number;
+  resourceCount: number;
 }
 
 export default function ClassTreePicker({
   tree,
   selected,
   onSelect,
+  resourceCounts,
 }: ClassTreePickerProps) {
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState<Set<number>>(() => new Set());
@@ -29,7 +34,7 @@ export default function ClassTreePicker({
 
     // Create TreeNodeData for each entry
     for (const node of tree) {
-      nodeMap.set(node.nodeId, { node, children: [], leafCount: 0 });
+      nodeMap.set(node.nodeId, { node, children: [], leafCount: 0, resourceCount: 0 });
     }
 
     // Link children to parents
@@ -54,7 +59,7 @@ export default function ClassTreePicker({
     }
     sortChildren(rootNodes);
 
-    // Compute leaf descendant counts bottom-up
+    // Compute leaf descendant counts bottom-up (static taxonomy count)
     function computeLeafCount(nodes: TreeNodeData[]): number {
       let total = 0;
       for (const n of nodes) {
@@ -70,8 +75,25 @@ export default function ClassTreePicker({
     }
     computeLeafCount(rootNodes);
 
+    // Compute aggregated resource counts bottom-up (actual resource data)
+    if (resourceCounts) {
+      function computeResourceCount(nodes: TreeNodeData[]): number {
+        let total = 0;
+        for (const n of nodes) {
+          if (n.children.length === 0) {
+            n.resourceCount = resourceCounts!.get(n.node.className) ?? 0;
+          } else {
+            n.resourceCount = computeResourceCount(n.children);
+          }
+          total += n.resourceCount;
+        }
+        return total;
+      }
+      computeResourceCount(rootNodes);
+    }
+
     return rootNodes;
-  }, [tree]);
+  }, [tree, resourceCounts]);
 
   // Filter tree by search query -- returns set of nodeIds that match
   // (including ancestors so the path to matches is visible)
@@ -171,7 +193,9 @@ export default function ClassTreePicker({
           )}
           <span className="tree-label">{node.className}</span>
           {hasBranch && (
-            <span className="tree-count">{treeNode.leafCount}</span>
+            <span className="tree-count">
+              {resourceCounts ? treeNode.resourceCount : treeNode.leafCount}
+            </span>
           )}
         </div>
         {hasBranch && isExpanded && (

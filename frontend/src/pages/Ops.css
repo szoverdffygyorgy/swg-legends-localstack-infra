@@ -23,7 +23,7 @@
   min-width: 0;
 }
 
-.section-title {
+.ops-section-title {
   color: var(--accent-gold);
   font-size: 1rem;
   font-weight: 600;
@@ -244,12 +244,6 @@
 .cell-metric--error {
   color: var(--status-error);
   font-weight: 700;
-}
-
-.empty-cell {
-  color: var(--text-dim);
-  text-align: center;
-  padding: 16px;
 }
 
 /* ─── Log viewer ──────────────────────────────────────── */

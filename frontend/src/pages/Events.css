@@ -36,7 +36,7 @@
 
 /* ─── Empty state ─────────────────────────────────────── */
 
-.empty-state {
+.events-empty-state {
   text-align: center;
   padding: 40px;
   color: var(--text-secondary);

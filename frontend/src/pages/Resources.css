@@ -216,15 +216,6 @@
   font-size: 0.85rem;
 }
 
-.cell-name {
-  color: var(--accent-cyan);
-  font-weight: 600;
-}
-
-.cell-class {
-  color: var(--text-secondary);
-}
-
 .cell-category {
   color: var(--text-dim);
   font-size: 0.8rem;

@@ -116,3 +116,36 @@ a {
 a:hover {
   color: var(--accent-cyan);
 }
+
+/* ─── Shared table cell styles ───────────────────────────── */
+
+.cell-name {
+  color: var(--accent-cyan);
+  font-weight: 600;
+}
+
+.cell-class {
+  color: var(--text-secondary);
+}
+
+.cell-planets {
+  color: var(--text-dim);
+}
+
+/* ─── Score tier colors (used across pages) ──────────────── */
+
+.score--top {
+  color: var(--stat-top);
+  text-shadow: 0 0 6px rgba(176, 128, 224, 0.4);
+}
+
+.score--high { color: var(--stat-high); }
+.score--fair { color: var(--stat-fair); }
+.score--mid  { color: var(--stat-mid); }
+.score--low  { color: var(--stat-low); }
+
+.empty-cell {
+  color: var(--text-dim);
+  text-align: center;
+  padding: 16px;
+}

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useOpsDashboard } from "../api/hooks";
 import type {
   PipelineExecution,
@@ -73,6 +73,7 @@ export default function Ops() {
   const [logFunction, setLogFunction] = useState("pipeline-archive");
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [expandedExec, setExpandedExec] = useState<Set<string>>(() => new Set());
+  const hasAutoExpanded = useRef(false);
 
   const { data, isLoading, isFetching, error, refetch } = useOpsDashboard(logFunction, autoRefresh);
 
@@ -83,12 +84,13 @@ export default function Ops() {
     }
   }, [data, autoRefresh]);
 
-  // Auto-expand first execution on initial data load
+  // Auto-expand first execution on initial data load (once only)
   useEffect(() => {
-    if (data?.executions.length && expandedExec.size === 0) {
+    if (data?.executions.length && !hasAutoExpanded.current) {
+      hasAutoExpanded.current = true;
       setExpandedExec(new Set([data.executions[0].executionArn]));
     }
-  }, [data, expandedExec.size]);
+  }, [data]);
 
   function toggleExpand(arn: string) {
     setExpandedExec((prev) => {
@@ -153,7 +155,7 @@ export default function Ops() {
 
       {/* ─── Pipeline Status ──────────────────────────────── */}
       <div className="ops-section">
-        <h2 className="section-title">
+        <h2 className="ops-section-title">
           Pipeline
           <span className="section-count">{data.executions.length}</span>
         </h2>
@@ -184,7 +186,7 @@ export default function Ops() {
       <div className="ops-row">
         {/* ─── Lambda Metrics ───────────────────────────────── */}
         <div className="ops-section ops-section--half">
-          <h2 className="section-title">Lambda Metrics (24h)</h2>
+          <h2 className="ops-section-title">Lambda Metrics (24h)</h2>
           <div className="table-wrapper">
             <table className="data-table">
               <thead>
@@ -219,7 +221,7 @@ export default function Ops() {
 
         {/* ─── SQS Queues ───────────────────────────────────── */}
         <div className="ops-section ops-section--half">
-          <h2 className="section-title">SQS Queues</h2>
+          <h2 className="ops-section-title">SQS Queues</h2>
           <div className="table-wrapper">
             <table className="data-table">
               <thead>
@@ -249,7 +251,7 @@ export default function Ops() {
 
       {/* ─── Recent Logs ────────────────────────────────────── */}
       <div className="ops-section">
-        <h2 className="section-title">
+        <h2 className="ops-section-title">
           Recent Logs
           <span className="section-count">{data.recentLogs.length}</span>
         </h2>

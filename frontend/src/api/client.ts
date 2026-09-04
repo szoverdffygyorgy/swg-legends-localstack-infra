@@ -29,14 +29,19 @@ const BASE = import.meta.env.VITE_API_BASE_URL || "/api";
 
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init);
-  const data = await response.json();
 
   if (!response.ok) {
-    const message = (data as { error?: string }).error ?? `HTTP ${response.status}`;
+    let message = `HTTP ${response.status}`;
+    try {
+      const body = await response.json();
+      message = (body as { error?: string }).error ?? message;
+    } catch {
+      // Response body wasn't JSON (e.g., 502 HTML page) -- use the HTTP status
+    }
     throw new Error(message);
   }
 
-  return data as T;
+  return (await response.json()) as T;
 }
 
 // ─── Resources ───────────────────────────────────────────────────────

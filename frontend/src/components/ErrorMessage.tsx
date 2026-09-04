@@ -7,8 +7,8 @@ interface ErrorMessageProps {
 
 export default function ErrorMessage({ message, onRetry }: ErrorMessageProps) {
   return (
-    <div className="error-box">
-      <div className="error-icon">!</div>
+    <div className="error-box" role="alert">
+      <div className="error-icon" aria-hidden="true">!</div>
       <div className="error-content">
         <div className="error-text">{message}</div>
         {onRetry && (

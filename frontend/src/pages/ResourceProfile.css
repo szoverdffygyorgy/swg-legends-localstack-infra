@@ -133,7 +133,7 @@
   padding: 24px;
 }
 
-.section-title {
+.profile-section-title {
   color: var(--accent-gold-dim);
   font-size: 0.75rem;
   font-weight: 600;
@@ -388,18 +388,6 @@
   color: var(--text-dim);
   font-size: 0.75rem;
 }
-
-/* ─── Score tier colors ───────────────────────────────── */
-
-.score--top {
-  color: var(--stat-top);
-  text-shadow: 0 0 6px rgba(176, 128, 224, 0.4);
-}
-
-.score--high { color: var(--stat-high); }
-.score--fair { color: var(--stat-fair); }
-.score--mid  { color: var(--stat-mid); }
-.score--low  { color: var(--stat-low); }
 
 /* ─── Show all button ─────────────────────────────────── */
 

@@ -19,6 +19,7 @@ import StatusBadge from "../components/StatusBadge";
 import LoadingSpinner from "../components/LoadingSpinner";
 import ErrorMessage from "../components/ErrorMessage";
 import "../components/StatBar.css";
+import "./ResourceProfile.css";
 import "./SchematicProfile.css";
 
 // ─── Helpers ─────────────────────────────────────────────────────────
@@ -160,7 +161,7 @@ export default function SchematicProfile() {
   return (
     <div className="profile-page">
       {/* Back button */}
-      <button className="profile-back" onClick={() => navigate(-1)}>
+      <button className="profile-back" onClick={() => window.history.length > 1 ? navigate(-1) : navigate("/resources")}>
         &larr; Back
       </button>
 
@@ -214,21 +215,25 @@ export default function SchematicProfile() {
 
       {/* Ingredients */}
       <div className="profile-section">
-        <h2 className="section-title">
+        <h2 className="profile-section-title">
           Ingredients
           <span className="schematics-count">{schematic.ingredients.length}</span>
         </h2>
-        <div className="ingredients-grid">
-          {schematic.ingredients.map((ing, i) => (
-            <IngredientCard key={i} ingredient={ing} />
-          ))}
-        </div>
+        {schematic.ingredients.length === 0 ? (
+          <p className="profile-empty">No ingredients.</p>
+        ) : (
+          <div className="ingredients-grid">
+            {schematic.ingredients.map((ing, i) => (
+              <IngredientCard key={i} ingredient={ing} />
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Experimental Properties */}
       {hasExperimental && (
         <div className="profile-section">
-          <h2 className="section-title">Experimental Properties</h2>
+          <h2 className="profile-section-title">Experimental Properties</h2>
           <div className="exp-groups">
             {schematic.experimentalGroups.map((group, gi) => (
               <ExperimentalGroupCard key={gi} group={group} />
@@ -240,7 +245,7 @@ export default function SchematicProfile() {
       {/* Best Current Resources */}
       {resourceIngredients.length > 0 && hasExperimental && (
         <div className="profile-section">
-          <h2 className="section-title">Best Current Resources</h2>
+          <h2 className="profile-section-title">Best Current Resources</h2>
           <p className="section-subtitle">
             Active resources ranked by weighted experimental score
           </p>

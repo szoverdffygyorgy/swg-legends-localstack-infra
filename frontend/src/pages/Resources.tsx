@@ -121,6 +121,15 @@ export default function Resources() {
     return [...seen.values()];
   }, [alertFiltered]);
 
+  // Step 3b: Aggregate resource counts by class (for tree sidebar)
+  const resourceCountMap = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const r of deduped) {
+      counts.set(r.resourceClass, (counts.get(r.resourceClass) || 0) + 1);
+    }
+    return counts;
+  }, [deduped]);
+
   // Step 4: Sort
   const sorted = useMemo(() => {
     const mult = sortDir === "asc" ? 1 : -1;
@@ -191,6 +200,7 @@ export default function Resources() {
           tree={classTree}
           selected={classFilter}
           onSelect={handleClassSelect}
+          resourceCounts={resourceCountMap}
         />
       </aside>
 
@@ -300,6 +310,13 @@ export default function Resources() {
                 </tr>
               </thead>
               <tbody>
+                {sorted.length === 0 && (
+                  <tr>
+                    <td colSpan={15} className="empty-cell">
+                      No resources match the current filters.
+                    </td>
+                  </tr>
+                )}
                 {sorted.map((r) => (
                   <tr key={r.resourceId} className="clickable-row" onClick={() => navigate(`/resources/${r.resourceId}`)}>
                     <td className="cell-name">{r.resourceName}</td>

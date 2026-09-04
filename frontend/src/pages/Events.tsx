@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useEvents } from "../api/hooks";
 import StatusBadge from "../components/StatusBadge";
 import LoadingSpinner from "../components/LoadingSpinner";
@@ -65,7 +66,7 @@ export default function Events() {
       {isLoading && <LoadingSpinner message="Loading events..." />}
       {error && <ErrorMessage message={error instanceof Error ? error.message : "Failed to load events"} onRetry={() => refetch()} />}
       {!isLoading && !error && events.length === 0 && (
-        <div className="empty-state">No events recorded for {date}.</div>
+        <div className="events-empty-state">No events recorded for {date}.</div>
       )}
       {!isLoading && !error && events.length > 0 && (
         <div className="events-list">
@@ -76,7 +77,7 @@ export default function Events() {
                 <StatusBadge variant={badgeVariant(evt.eventType)}>
                   {evt.eventType}
                 </StatusBadge>
-                <span className="event-name">{evt.resourceName}</span>
+                <Link to={`/resources/${evt.resourceId}`} className="event-name">{evt.resourceName}</Link>
                 <span className="event-class">{evt.resourceClass}</span>
               </div>
               <div className="event-details">

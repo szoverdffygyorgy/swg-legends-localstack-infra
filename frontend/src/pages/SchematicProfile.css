@@ -279,29 +279,6 @@
   color: var(--text-secondary);
 }
 
-/* ─── Score tier colors ───────────────────────────────── */
-
-.score--top {
-  color: var(--stat-top);
-  text-shadow: 0 0 6px rgba(176, 128, 224, 0.4);
-}
-
-.score--high {
-  color: var(--stat-high);
-}
-
-.score--fair {
-  color: var(--stat-fair);
-}
-
-.score--mid {
-  color: var(--stat-mid);
-}
-
-.score--low {
-  color: var(--stat-low);
-}
-
 /* ─── Show more / less button ─────────────────────────── */
 
 .ranking-more-btn {

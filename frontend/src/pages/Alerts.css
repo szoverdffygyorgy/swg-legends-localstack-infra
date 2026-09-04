@@ -13,7 +13,7 @@
   padding: 16px;
 }
 
-.section-title {
+.alerts-section-title {
   color: var(--accent-gold);
   font-size: 1rem;
   font-weight: 600;
@@ -301,7 +301,7 @@
 
 /* ─── Empty state ─────────────────────────────────────── */
 
-.empty-state {
+.alerts-empty-state {
   text-align: center;
   padding: 24px;
   color: var(--text-secondary);
@@ -400,12 +400,4 @@
   color: var(--text-dim);
   font-size: 0.75rem;
   font-family: "Share Tech Mono", monospace;
-}
-
-.cell-class {
-  color: var(--text-secondary);
-}
-
-.cell-planets {
-  color: var(--text-dim);
 }

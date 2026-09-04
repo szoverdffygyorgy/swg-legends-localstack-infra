@@ -136,6 +136,16 @@ export default function History() {
     return [...seen.values()];
   }, [alertFiltered]);
 
+  // Step 2b: Aggregate resource counts by class (for tree sidebar)
+  const resourceCountMap = useMemo(() => {
+    if (!hasActiveFilter || deduped.length === 0) return undefined;
+    const counts = new Map<string, number>();
+    for (const r of deduped) {
+      counts.set(r.resourceClass, (counts.get(r.resourceClass) || 0) + 1);
+    }
+    return counts;
+  }, [deduped, hasActiveFilter]);
+
   // Step 3: Sort
   const sorted = useMemo(() => {
     const mult = sortDir === "asc" ? 1 : -1;
@@ -206,6 +216,7 @@ export default function History() {
           tree={classTree}
           selected={classFilter}
           onSelect={handleClassSelect}
+          resourceCounts={resourceCountMap}
         />
       </aside>
 

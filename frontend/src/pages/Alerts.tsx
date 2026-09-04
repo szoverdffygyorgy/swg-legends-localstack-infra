@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
+import { Link } from "react-router-dom";
 import { createAlertRule } from "../api/client";
 import {
   useAlertRules,
@@ -210,7 +211,7 @@ export default function Alerts() {
     <div className="alerts-page">
       {/* ─── Create Rule Form ──────────────────────────────── */}
       <div className="alerts-section">
-        <h2 className="section-title">Create Alert Rule</h2>
+        <h2 className="alerts-section-title">Create Alert Rule</h2>
         <form className="create-form" onSubmit={handleCreate}>
           {/* Name + Class row */}
           <div className="form-row">
@@ -360,12 +361,12 @@ export default function Alerts() {
 
       {/* ─── Active Rules ──────────────────────────────────── */}
       <div className="alerts-section">
-        <h2 className="section-title">
+        <h2 className="alerts-section-title">
           Active Rules
           <span className="section-count">{rules.length}</span>
         </h2>
         {rules.length === 0 ? (
-          <div className="empty-state">
+          <div className="alerts-empty-state">
             No alert rules defined. Create one above.
           </div>
         ) : (
@@ -427,12 +428,12 @@ export default function Alerts() {
 
       {/* ─── Fired Alert History ────────────────────────────── */}
       <div className="alerts-section">
-        <h2 className="section-title">
+        <h2 className="alerts-section-title">
           Fired Alerts
           <span className="section-count">{firedAlerts.length}</span>
         </h2>
         {firedAlerts.length === 0 ? (
-          <div className="empty-state">No alerts have fired yet.</div>
+          <div className="alerts-empty-state">No alerts have fired yet.</div>
         ) : (
           <div className="table-wrapper">
             <table className="data-table">
@@ -450,7 +451,9 @@ export default function Alerts() {
                 {firedAlerts.map((alert, i) => (
                   <tr key={i}>
                     <td style={{ color: "var(--accent-gold)" }}>{alert.ruleName}</td>
-                    <td className="cell-name">{alert.resourceName}</td>
+                    <td className="cell-name">
+                      <Link to={`/resources/${alert.resourceId}`}>{alert.resourceName}</Link>
+                    </td>
                     <td className="cell-class">{alert.resourceClass}</td>
                     <td className="cell-planets">{alert.planets}</td>
                     <td className="cell-stat-label" style={{ fontFamily: "'Share Tech Mono', monospace" }}>
