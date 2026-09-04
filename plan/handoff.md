@@ -4,7 +4,7 @@
 
 A local AWS infrastructure playground for learning AWS services by building a real, useful tool: a crafting and resource intelligence system for the Star Wars Galaxies (SWG) Legends server (NGE). All AWS services are emulated locally via LocalStack -- zero cloud costs.
 
-**All 8 modules are complete**, plus a React frontend and a schematics crafting data pipeline. The system ingests real SWG resource data from swgaide.com, stores it in DynamoDB, publishes spawn/despawn events via SNS/SQS, evaluates hierarchy-aware alert rules via Lambda, exposes everything through a REST API (14 endpoints), orchestrates the ingestion pipeline via Step Functions, schedules automatic runs via EventBridge, monitors health via CloudWatch, classifies all resources against a full 816-node class hierarchy, ingests 3,673 crafting schematics with ingredient and experimental stat weight data, and presents it all in a browser-based React dashboard (powered by TanStack Query) with a persistent class tree sidebar, resource profile pages with stat bar visualizations and "Used In Schematics" integration, historical resource browsing, ops monitoring, and alert-as-filter integration with enable/disable toggle.
+**All 8 modules are complete**, plus a React frontend and a schematics crafting data pipeline. The system ingests real SWG resource data from swgaide.com, stores it in DynamoDB, publishes spawn/despawn events via SNS/SQS, evaluates hierarchy-aware alert rules via Lambda, exposes everything through a REST API (14 endpoints), orchestrates the ingestion pipeline via Step Functions, schedules automatic runs via EventBridge, monitors health via CloudWatch, classifies all resources against a full 816-node class hierarchy, ingests 3,673 crafting schematics with ingredient and experimental stat weight data, and presents it all in a browser-based React dashboard (powered by TanStack Query) with a persistent class tree sidebar showing dynamic resource counts, resource profile pages with stat bar visualizations, inline schematic scoring (0-1000 scale), and "Used In Schematics" integration with preCU/low-score filters, a dedicated Schematic Profile page with ingredient breakdown, experimental property weights, and best current/historical resource rankings, historical resource browsing, ops monitoring, and alert-as-filter integration with enable/disable toggle.
 
 ## Decisions Made (Before Development)
 
@@ -196,32 +196,36 @@ Crafting recipe data pipeline: download, parse, and store SWGAide schematics wit
 - **Parser** (`src/ingest/parse-schematics.ts`): parses all 3,673 schematics (2,040 NGE + 1,633 pre-CU) with resolved class names, ingredient lists, and experimental stat weights. Zero unresolved class IDs.
 - **DynamoDB table** (`schematics`): single-table design with two item types:
   - `pk=SCHEM#{id}, sk=META` -- schematic metadata (3,673 items)
-  - `pk=CLASS#{className}, sk=SCHEM#{id}` -- ingredient reverse index (9,324 items)
+  - `pk=CLASS#{className}, sk=SCHEM#{id}` -- ingredient reverse index (9,324 items), enriched with `quality` and `experimentalGroups` for inline scoring without per-schematic API calls
   - `by-category` GSI for browsing by category
 - **Seed script** (`scripts/seed-schematics.ts`, `npm run schematics:seed`): download + parse + batch write (12,997 items total)
 - **Query script** (`src/query/find-schematics.ts`, `npm run schematics:query`): search by name, class, category, or ID
 - **API endpoints** (via `api-get-schematics` Lambda):
   - `GET /schematics?class=Metal&hierarchy=true` -- hierarchy-aware ingredient index query (walks class tree ancestors)
   - `GET /schematics/{id}` -- full schematic detail with ingredients and experimental groups
-- **Resource Profile integration:** "Used In Schematics" section shows matching schematics grouped by matched class level (e.g., "as Copper: 254", "as Metal: 1,052")
+- **Resource Profile integration:** "Used In Schematics" section shows matching schematics in collapsible groups by matched class level, with inline weighted scores (0-1000 scale), preCU filter toggle, and low-score filter toggle. Scores computed client-side from enriched CLASS# index data. Each schematic links to the dedicated Schematic Profile page.
+- **Schematic Profile page** (`/schematics/{id}`): shows ingredients (resource vs component), experimental properties with stat weight chips, and "Best Current Resources" / "Historical Best" rankings per ingredient class, scored and sorted by weighted experimental quality (0-1000 scale). Top 5 shown with "show more" expansion.
+- **Scoring utilities** (`frontend/src/utils/scoring.ts`): shared scoring functions used by both profile pages. Formula: `property_score = sum(resource_stat * weight / 100)`, overall = average of all property scores. Score tier thresholds (950/900/800/500) match the raw stat color tiers.
 - **OpenTofu module** (`tofu/schematics/`): provisions the schematics DynamoDB table and GSIs
 - **Types:** `Schematic`, `SchematicIngredient`, `ExperimentalGroup`, `ExperimentalProperty` in `src/types.ts`
 
 ### Frontend -- COMPLETE
 **Tech:** React 19, Vite 6, TypeScript, React Router 7, TanStack Query (React Query)
 
-- **6 pages:**
-  - **Resources** -- persistent class tree sidebar (816-node collapsible hierarchy with search), filterable/sortable table with stat quality % display using dual color scales (purple > blue > green > yellow > red for both raw values and quality %), resource deduplication, Category column, color legend, alert dropdown to apply configured alerts as filters. Clickable rows navigate to Resource Profile.
-  - **History** -- past (despawned) resources with class tree sidebar, alert preset dropdown, name search typeahead, stat threshold filters. Filter-first UX: page starts empty until a filter is active. Reuses ClassTreePicker component. Clickable rows navigate to Resource Profile.
-  - **Resource Profile** (`/resources/:id`) -- dedicated detail page with parallel fetch from active + history tables. Shows Available/Despawned status badge, full classification breadcrumb, planet chips, spawn/despawn dates, reporter. StatBar component visualizes each stat on a 0-1000 scale with highlighted cap range [min, max], filled value position, and 5-tier raw-value color coding (950+/900+/800+/500+/<500). Cap min/max labels shown below each bar. **"Used In Schematics" section** shows hierarchy-aware schematic matches grouped by class level.
-  - **Events** -- date-based feed with type filters
-  - **Alerts** -- multi-threshold form (`statThresholds`), repeatable planet picker, class typeahead with hierarchy breadcrumbs, clickable enable/disable toggle button (green "Enabled" / amber "Disabled"), fired alert history. **Optimistic updates** on toggle (instant UI response with rollback on failure).
-  - **Ops** (replaces Pipeline) -- system health bar, pipeline execution history, Lambda metrics (24h), SQS queue health, CloudWatch log viewer with function dropdown and auto-refresh. **Background refresh indicator** ("Refreshing..." with pulse animation) using `isFetching` vs `isLoading` distinction.
+- **6 pages + 1 profile page:**
+  - **Resources** -- persistent class tree sidebar (816-node collapsible hierarchy with search, showing dynamic resource counts aggregated up the tree), filterable/sortable table with stat quality % display using dual color scales (purple > blue > green > yellow > red for both raw values and quality %), resource deduplication, Category column, color legend, alert dropdown to apply configured alerts as filters. Empty state for zero filter results. Clickable rows navigate to Resource Profile.
+  - **History** -- past (despawned) resources with class tree sidebar (dynamic counts when filter active, static fallback otherwise), alert preset dropdown, name search typeahead, stat threshold filters. Filter-first UX: page starts empty until a filter is active. Reuses ClassTreePicker component. Clickable rows navigate to Resource Profile.
+  - **Resource Profile** (`/resources/:id`) -- dedicated detail page with parallel fetch from active + history tables. Shows Available/Despawned status badge, full classification breadcrumb, planet chips, spawn/despawn dates, reporter. StatBar component visualizes each stat on a 0-1000 scale with highlighted cap range [min, max], filled value position, and 5-tier raw-value color coding (950+/900+/800+/500+/<500). Cap min/max labels shown below each bar. **"Used In Schematics" section** with collapsible groups by matched class, inline weighted scores (0-1000), "Show preCU schematics" and "Show low scores (< 500)" filter toggles. Schematic names link to Schematic Profile. Safe back button (falls back to /resources on direct navigation).
+  - **Schematic Profile** (`/schematics/:id`) -- full schematic detail: header with NGE/preCU badge, profession, level, complexity, XP, quality. Ingredients section (resource vs component cards). Experimental Properties section with stat weight chips. "Best Current Resources" per ingredient class ranked by weighted score, with "show more" expansion. "Historical Best" section (collapsed by default, toggleable). Safe back button.
+  - **Events** -- date-based feed with type filters. Resource names link to resource profile.
+  - **Alerts** -- multi-threshold form (`statThresholds`), repeatable planet picker, class typeahead with hierarchy breadcrumbs, clickable enable/disable toggle button (green "Enabled" / amber "Disabled"), fired alert history with resource names linked to profile. **Optimistic updates** on toggle (instant UI response with rollback on failure).
+  - **Ops** (replaces Pipeline) -- system health bar, pipeline execution history (auto-expands first execution once, collapsible), Lambda metrics (24h), SQS queue health, CloudWatch log viewer with function dropdown and auto-refresh. **Background refresh indicator** ("Refreshing..." with pulse animation) using `isFetching` vs `isLoading` distinction.
 - **Header:** "Synced: Xh ago" indicator on every page (reads from `/pipeline/status`), **auto-updates every 60s** via `refetchInterval`, 5 nav tabs: Resources, History, Events, Alerts, Ops
 - **TanStack Query (React Query):** All data fetching migrated from manual `useState`/`useEffect`/`fetch` to `useQuery`/`useMutation` hooks. Provides: automatic caching with stale-while-revalidate, background refetching on window focus, `refetchInterval` for polling, `keepPreviousData` for smooth filter transitions, optimistic updates on mutations, cache invalidation after create/delete/toggle operations.
-- **Custom hooks layer** (`frontend/src/api/hooks.ts`): 16 hooks (12 queries + 3 mutations + query key factory) wrapping all API calls. Centralized query keys prevent typos and enable precise cache invalidation.
-- **Shared utilities:** `utils/stats.ts` (stat quality display helpers), `utils/alerts.ts` (alert matching, label formatting, planet extraction) -- used by both Resources and History pages
-- **Components:** ClassTreePicker (sidebar), StatBar (cap range visualization), StatusBadge, LoadingSpinner, ErrorMessage
+- **Custom hooks layer** (`frontend/src/api/hooks.ts`): 18 hooks (14 queries including 2 batch `useQueries` hooks + 3 mutations + query key factory) wrapping all API calls. Centralized query keys prevent typos and enable precise cache invalidation. Batch hooks (`useResourcesByClasses`, `useHistoryByClasses`) use `useQueries` for parallel fetching without rules-of-hooks violations.
+- **Shared utilities:** `utils/stats.ts` (stat quality display helpers), `utils/alerts.ts` (alert matching, label formatting, planet extraction), `utils/scoring.ts` (schematic scoring: `computePropertyScore`, `computeOverallScore`, `scoreTierClass`, `getRelevantStats`, `extractStats` on 0-1000 scale) -- used across multiple pages
+- **Components:** ClassTreePicker (sidebar with optional dynamic resource counts), StatBar (cap range visualization), StatusBadge, LoadingSpinner (with `role="status"`), ErrorMessage (with `role="alert"`)
+- **CSS architecture:** page-scoped class names to avoid global collisions (`.profile-section-title`, `.alerts-section-title`, `.ops-section-title`, etc.). Shared styles (`.score--*` tier colors, `.cell-name`/`.cell-class`/`.cell-planets`, `.empty-cell`) in `theme.css`.
 - **SWG NGE color theme:** dark navy backgrounds, pale blue text, warm gold accents (CSS custom properties)
 - **Class tree JSON** served from S3 at runtime (not bundled); Vite proxies to S3 in dev
 - **Vite dev server** with API proxy to LocalStack API Gateway (`http://localhost:3000`)
@@ -362,6 +366,34 @@ npm run frontend:dev       # Start React dev server at http://localhost:3000
 - Wants to understand tradeoffs, not just implementations
 - Prefers learning the widely-used, general-purpose tools first; niche things later
 
+## Recent Changes (Latest Session)
+
+### Schematics & Scoring Feature
+- **Schematic Profile page** (`/schematics/:id`): new page with ingredients, experimental properties, best current/historical resource rankings
+- **Resource Profile redesign**: "Used In Schematics" section replaced chip-based display with collapsible scored list, preCU filter, low-score filter
+- **CLASS# index enrichment**: `seed-schematics.ts` now writes `quality` and `experimentalGroups` to CLASS# index items, enabling inline scoring without per-schematic API calls. Lambda response updated to return these fields. **Requires re-seed after code update** (`npm run schematics:seed`).
+- **Scoring utilities** (`utils/scoring.ts`): 0-1000 scale matching stat display, shared across pages
+- **Batch query hooks** (`useResourcesByClasses`, `useHistoryByClasses`): `useQueries`-based hooks for parallel resource fetching without rules-of-hooks violations
+
+### Bug Fixes
+- **`fetchJson` error handling**: now checks `response.ok` before parsing JSON body -- non-JSON error responses (502, 503) no longer crash with `SyntaxError`
+- **Ops pipeline collapse**: first execution auto-expand now runs once only (was re-expanding on every collapse via `useRef`)
+- **`filteredSchematicCount`**: header count now respects both preCU and low-score filters
+- **Back button safety**: `navigate(-1)` falls back to `/resources` when no browser history exists (direct links/bookmarks)
+- **Resources empty state**: table shows "No resources match" when filters return zero results
+
+### CSS Architecture
+- **Namespaced section titles**: `.section-title` collision resolved -- now `.profile-section-title`, `.alerts-section-title`, `.ops-section-title`
+- **Namespaced empty states**: `.empty-state` collision resolved -- now `.events-empty-state`, `.alerts-empty-state`
+- **Shared styles in theme.css**: `.score--*` tier colors, `.cell-name`/`.cell-class`/`.cell-planets`, `.empty-cell` moved from page CSS to global theme
+- **Convention**: new pages should use page-prefixed class names for any class that might collide (section titles, empty states, etc.)
+
+### UX Improvements
+- **Event resource names** now link to resource profile
+- **Fired alert resource names** now link to resource profile
+- **ClassTreePicker dynamic counts**: shows actual resource counts (aggregated up the tree) instead of static leaf type counts. Resources page always shows real counts; History page falls back to static counts when no filter is active.
+- **ARIA roles**: `role="alert"` on ErrorMessage, `role="status"` + `aria-live="polite"` on LoadingSpinner
+
 ## Possible Extensions
 
 Prioritized backlog organized by learning value and feature impact.
@@ -380,11 +412,11 @@ These teach new AWS concepts while delivering meaningful features.
 
 These use patterns already learned but deliver strong user-facing results.
 
-| Item | Why |
-|------|-----|
-| **Schematic Profile page** | Dedicated `/schematics/{id}` page showing full recipe detail, ingredient breakdown, and best current/historical resources for each slot. Foundation already in place (API endpoint exists, types defined). |
-| **Best resource scoring endpoint** | `GET /schematics/{id}/best-resources` applies experimental stat weights to rank current resources per ingredient slot. The experimental weight data is already parsed and stored. |
-| **Crafting calculator page** | Select a schematic, see what active/historical resources would give the best results |
+| Item | Status |
+|------|--------|
+| ~~**Schematic Profile page**~~ | **DONE** -- `/schematics/{id}` with ingredients, experimental properties, best current/historical resources ranked by weighted score |
+| ~~**Best resource scoring**~~ | **DONE** -- Scoring computed client-side from enriched CLASS# index data. Shared `utils/scoring.ts` on 0-1000 scale. No separate API endpoint needed. |
+| **Crafting calculator page** | Partially addressed by Schematic Profile's "Best Current Resources" section. A full calculator would add multi-slot optimization (finding the best resource *combination* across all ingredient slots). |
 | **Resource comparison** | On the Resource Profile page, show how this resource ranks against other active/past resources of the same class |
 | **Pagination** | Server-side pagination with DynamoDB cursor tokens (ExclusiveStartKey pattern) as data grows |
 

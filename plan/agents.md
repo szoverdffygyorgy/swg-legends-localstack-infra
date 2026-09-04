@@ -133,28 +133,30 @@ swg-legends-localstack-infra/
     index.html                # Vite entry point
     src/
       main.tsx                # React root mount + QueryClientProvider
-      App.tsx                 # Routes: /resources, /resources/:id, /history, /events, /alerts, /ops (/pipeline redirects to /ops)
+      App.tsx                 # Routes: /resources, /resources/:id, /schematics/:id, /history, /events, /alerts, /ops (/pipeline redirects to /ops)
       api/
         client.ts             # Typed fetch wrapper for all API endpoints
         types.ts              # Response types matching Lambda output
         queryClient.ts        # TanStack Query client configuration (retry, staleTime, gcTime)
-        hooks.ts              # 16 custom hooks (12 queries + 3 mutations + query key factory)
+        hooks.ts              # 18 custom hooks (14 queries incl. 2 batch useQueries + 3 mutations + query key factory)
       pages/
-        Resources.tsx + .css  # Resource table with class tree sidebar, stat quality %, alert dropdown, clickable rows
-        ResourceProfile.tsx + .css  # Resource detail page with StatBar, status badge, "Used In Schematics" section
-        History.tsx + .css    # Past resources with class tree sidebar, alert presets, name search, filter-first UX
-        Events.tsx + .css     # Event feed with date picker + type filter
-        Alerts.tsx + .css     # Alert rules CRUD (multi-threshold form with typeahead) + enable/disable toggle + fired history
+        Resources.tsx + .css  # Resource table with class tree sidebar (dynamic counts), stat quality %, alert dropdown, clickable rows
+        ResourceProfile.tsx + .css  # Resource detail page with StatBar, status badge, "Used In Schematics" with inline scoring + filters
+        SchematicProfile.tsx + .css  # Schematic detail page with ingredients, experimental properties, best resource rankings
+        History.tsx + .css    # Past resources with class tree sidebar (dynamic counts), alert presets, name search, filter-first UX
+        Events.tsx + .css     # Event feed with date picker + type filter, resource names linked to profile
+        Alerts.tsx + .css     # Alert rules CRUD (multi-threshold form with typeahead) + enable/disable toggle + fired history with resource links
         Ops.tsx + .css        # System health bar, pipeline history, Lambda metrics, SQS queues, log viewer
       components/
         Layout.tsx + .css     # Header, nav tabs (Resources/History/Events/Alerts/Ops), sync indicator, footer
-        ClassTreePicker.tsx + .css  # Expandable resource class hierarchy picker for filtering
+        ClassTreePicker.tsx + .css  # Expandable resource class hierarchy picker with optional dynamic resource counts
         StatBar.tsx + .css    # Stat bar with 0-1000 scale, cap range highlight, value fill, raw-value color tiers
         StatusBadge.tsx + .css      # Colored status pill
-        LoadingSpinner.tsx + .css   # Loading state
-        ErrorMessage.tsx + .css     # Error display with retry button
+        LoadingSpinner.tsx + .css   # Loading state (role="status", aria-live)
+        ErrorMessage.tsx + .css     # Error display with retry button (role="alert")
       utils/
         stats.ts              # Shared stat quality helpers (statQuality, qualityClass, rawValueClass)
+        scoring.ts            # Schematic scoring (computePropertyScore, computeOverallScore, scoreTierClass, 0-1000 scale)
         alerts.ts             # Shared alert helpers (matching, formatting, planet extraction)
       styles/
         theme.css             # SWG NGE color palette (CSS custom properties)
@@ -346,11 +348,11 @@ These teach new AWS concepts while delivering meaningful features.
 
 These use patterns already learned but deliver strong user-facing results.
 
-| Item | Why |
-|------|-----|
-| **Schematic Profile page** | Dedicated `/schematics/{id}` page showing full recipe detail, ingredient breakdown, and best current/historical resources for each slot. API endpoint already exists. |
-| **Best resource scoring endpoint** | `GET /schematics/{id}/best-resources` applies experimental stat weights to rank current resources per ingredient slot |
-| **Crafting calculator page** | Select a schematic, see what active/historical resources would give the best results |
+| Item | Status |
+|------|--------|
+| ~~**Schematic Profile page**~~ | **DONE** -- `/schematics/{id}` with ingredients, experimental properties, best current/historical resources |
+| ~~**Best resource scoring**~~ | **DONE** -- Client-side scoring from enriched CLASS# index data, shared `utils/scoring.ts` on 0-1000 scale |
+| **Crafting calculator page** | Partially addressed by Schematic Profile. Full calculator would add multi-slot optimization. |
 | **Resource comparison** | On the Resource Profile page, show how this resource ranks against other active/past resources of the same class |
 | **Pagination** | Server-side pagination with DynamoDB cursor tokens (ExclusiveStartKey pattern) as data grows |
 
