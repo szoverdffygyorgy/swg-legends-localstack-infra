@@ -100,6 +100,27 @@ export const SWGAIDE_SCHEMATICS_URL =
 /** DynamoDB table name for schematics */
 export const SCHEMATICS_TABLE = "schematics";
 
+// ─── TTL (Time-To-Live) ──────────────────────────────────────────────
+// DynamoDB TTL automatically deletes items after a specified time.
+// Items without an expiresAt attribute are never touched by TTL.
+
+/** Number of days before event-log items (SPAWNED/DESPAWNED/DATA_ISSUE) expire */
+export const EVENT_TTL_DAYS = 90;
+
+/** Number of days before fired alert items expire */
+export const FIRED_ALERT_TTL_DAYS = 30;
+
+/**
+ * Compute a Unix epoch timestamp N days from now.
+ *
+ * DynamoDB TTL requires a Number attribute containing the expiration
+ * time as seconds since the Unix epoch. Items with this value in the
+ * past are automatically deleted (within ~48 hours).
+ */
+export function ttlEpoch(days: number): number {
+  return Math.floor(Date.now() / 1000) + days * 24 * 60 * 60;
+}
+
 // ─── Messaging constants ─────────────────────────────────────────────
 // LocalStack uses account ID 000000000000 for all resources.
 // ARNs and URLs follow the same format as real AWS.

@@ -43,6 +43,7 @@ All modules complete, plus schematics pipeline. The system is fully operational.
 | Alert matching | Hierarchy-aware class matching, `statThresholds` map (AND), `planets` array (OR) |
 | Schematics | 3,673 schematics from SWGAide, stored in DynamoDB (single-table: SCHEM# metadata + CLASS# ingredient index) |
 | SWGAide class mapping | 815-entry abbreviation -> className mapping in `src/data/swgaide-class-map.json` |
+| DynamoDB TTL | Enabled on `event-log` (90-day retention) and `alert-rules` FIRED items (30-day retention). Attribute: `expiresAt` (Unix epoch seconds). Items without `expiresAt` (META, RULE) persist indefinitely. Helper: `ttlEpoch(days)` in `src/config.ts`. |
 
 ## Quick Start from Scratch
 
@@ -118,7 +119,7 @@ swg-legends-localstack-infra/
     main.tf                   # Root provider config (Foundation)
     variables.tf              # Shared variables
     storage/                  # S3 bucket + DynamoDB tables (resources w/ by-category GSI, resource-history w/ by-category GSI)
-    messaging/                # SNS topics + SQS queues + DynamoDB tables (event-log, alert-rules)
+    messaging/                # SNS topics + SQS queues + DynamoDB tables (event-log w/ TTL, alert-rules w/ TTL)
     compute/                  # Lambda functions (alert-evaluator, history-recorder) + IAM + SQS event sources
     api/                      # API Gateway REST API (14 endpoints) + 7 API Lambdas + IAM
     orchestration/            # Step Functions state machine + 7 pipeline Lambdas + IAM
@@ -224,6 +225,7 @@ swg-legends-localstack-infra/
     seed-schematics.ts        # Download + parse + batch write schematics to DynamoDB (12,997 items)
     backfill-resource-classes.ts  # Backfill classPath/classCategory/classGroup on existing resource items
     backfill-resource-history.ts  # Backfill classification + flattened stats on existing history items
+    backfill-ttl.ts               # Backfill expiresAt on existing event-log + alert-rules FIRED items
   data/                       # Downloaded XML + generated dashboards (gitignored)
   dist/lambda/                # Built Lambda zip files (gitignored)
 ```
@@ -232,7 +234,7 @@ swg-legends-localstack-infra/
 
 | Service | Count | Details |
 |---------|-------|---------|
-| DynamoDB tables | 6 | resources (by-planet + by-category GSIs), resource-history (by-category GSI), event-log, alert-rules, resource-classes (by-parent + by-path GSIs), schematics (by-category GSI) |
+| DynamoDB tables | 6 | resources (by-planet + by-category GSIs), resource-history (by-category GSI), event-log (TTL: 90 days), alert-rules (FIRED TTL: 30 days), resource-classes (by-parent + by-path GSIs), schematics (by-category GSI) |
 | Lambda functions | 17 | 2 compute (SQS-triggered), 7 API (Gateway-triggered), 7 pipeline (Step Functions), 1 archive |
 | S3 buckets | 2 | swg-legends-data (XML archives + class tree JSON), swg-legends-frontend (static hosting) |
 | SQS queues | 2 | spawn-events, despawn-events |
@@ -259,6 +261,7 @@ swg-legends-localstack-infra/
 | `npm run seed:classes` | Load resource-class-tree.json into resource-classes DynamoDB table |
 | `npm run backfill:classes` | Backfill classPath/classCategory/classGroup on existing resource items |
 | `npm run backfill:history` | Backfill classification + flattened stats on existing history items |
+| `npm run backfill:ttl` | Backfill expiresAt on existing event-log + alert-rules FIRED items (idempotent) |
 
 ### Schematics
 | Script | What it does |
@@ -340,7 +343,7 @@ These teach new AWS concepts while delivering meaningful features.
 
 | Item | New Infra Learned | Feature Value |
 |------|-------------------|---------------|
-| **DynamoDB TTL (Time-To-Live)** | DynamoDB lifecycle management, automatic item expiration | Keeps event-log and history from growing unbounded |
+| ~~**DynamoDB TTL (Time-To-Live)**~~ | ~~DynamoDB lifecycle management, automatic item expiration~~ | **DONE** -- event-log (90 days) and alert-rules/FIRED (30 days) auto-expire via `expiresAt` attribute. resource-history intentionally permanent. |
 | **Resource notifications (SNS email)** | SNS email subscriptions, delivery mechanisms | Makes alerts actually *alert* you -- fired alerts trigger real emails |
 | **Lambda layers** | Lambda code sharing pattern | Cleans up duplicated classification cache loading across 5+ Lambdas |
 
@@ -391,7 +394,7 @@ Worth doing eventually, not urgent.
 
 ### Suggested Learning Path
 
-Recommended order for next sessions: **DynamoDB TTL** (quick win, new concept) -> **CI/CD pipeline** (GitHub Actions, practical skill) -> **Deploy to real AWS** (ultimate validation, ~$0-3/mo) -> **Lambda layers** (code hygiene) -> **SNS email** (real alerts). Then feature work (watchlist, harvest planner) when actively playing SWG.
+Recommended order for next sessions: ~~**DynamoDB TTL**~~ (DONE) -> **CI/CD pipeline** (GitHub Actions, practical skill) -> **Deploy to real AWS** (ultimate validation, ~$0-3/mo) -> **Lambda layers** (code hygiene) -> **SNS email** (real alerts). Then feature work (watchlist, harvest planner) when actively playing SWG.
 
 ## Known LocalStack Limitations
 

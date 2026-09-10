@@ -28,6 +28,16 @@ const endpoint = process.env.LOCALSTACK_ENDPOINT || "http://localhost:4566";
 const region = process.env.AWS_REGION_CUSTOM || process.env.AWS_REGION || "us-east-1";
 const BATCH_SIZE = 25;
 
+// ─── TTL ─────────────────────────────────────────────────────────────
+// DATA_ISSUE event items expire after 90 days (same as other event-log items).
+
+const EVENT_TTL_DAYS = 90;
+
+/** Unix epoch seconds N days from now. */
+function ttlEpoch(days: number): number {
+  return Math.floor(Date.now() / 1000) + days * 24 * 60 * 60;
+}
+
 const ALL_STAT_KEYS = ["er", "cr", "cd", "dr", "fl", "hr", "ma", "pe", "oq", "sr", "ut"];
 
 const s3 = new S3Client({
@@ -299,6 +309,8 @@ export async function handler(event: UpdateInput): Promise<UpdateOutput> {
 
     console.log(`Writing ${unclassifiedClasses.size} DATA_ISSUE event(s) for unclassified classes`);
 
+    const expiresAt = ttlEpoch(EVENT_TTL_DAYS);
+
     for (const className of unclassifiedClasses) {
       await docClient.send(
         new PutCommand({
@@ -314,6 +326,7 @@ export async function handler(event: UpdateInput): Promise<UpdateOutput> {
             statSummary: "",
             detectedAt: timestamp,
             issue: `Resource class "${className}" not found in classification hierarchy. The game may have been patched with new resource types. Re-scrape with: npm run scrape:tree && npm run seed:classes`,
+            expiresAt,
           },
         })
       );

@@ -89,6 +89,17 @@ const docClient = DynamoDBDocumentClient.from(ddbClient, {
   marshallOptions: { removeUndefinedValues: true },
 });
 
+// ─── TTL ─────────────────────────────────────────────────────────────
+// FIRED alert items expire after 30 days. DynamoDB TTL deletes them automatically.
+// RULE items (alert definitions) have no expiresAt and persist indefinitely.
+
+const FIRED_ALERT_TTL_DAYS = 30;
+
+/** Unix epoch seconds N days from now. */
+function ttlEpoch(days: number): number {
+  return Math.floor(Date.now() / 1000) + days * 24 * 60 * 60;
+}
+
 // ─── Classification cache ────────────────────────────────────────────
 // Loaded once on cold start, reused across invocations.
 
@@ -208,6 +219,7 @@ async function recordFiredAlert(resource: SpawnMessage, rule: AlertRule): Promis
         planets: resource.planets.join(", "),
         stats: resource.stats,
         matchedAt: now,
+        expiresAt: ttlEpoch(FIRED_ALERT_TTL_DAYS),
       },
     })
   );

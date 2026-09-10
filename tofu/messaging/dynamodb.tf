@@ -32,6 +32,15 @@ resource "aws_dynamodb_table" "event_log" {
     type = "S" # Format: "timestamp#resourceId"
   }
 
+  # TTL: automatically delete event items after 90 days.
+  # Each event item includes an expiresAt attribute (Unix epoch seconds).
+  # The META item (date="META", sk="lastSync") omits expiresAt and is
+  # never touched by TTL -- it persists indefinitely.
+  ttl {
+    enabled        = true
+    attribute_name = "expiresAt"
+  }
+
   tags = {
     Project = "swg-legends"
     Module  = "messaging"
@@ -69,6 +78,14 @@ resource "aws_dynamodb_table" "alert_rules" {
   attribute {
     name = "sk"
     type = "S"
+  }
+
+  # TTL: automatically delete FIRED alert items after 30 days.
+  # Each FIRED item includes an expiresAt attribute (Unix epoch seconds).
+  # RULE items (alert definitions) omit expiresAt and persist indefinitely.
+  ttl {
+    enabled        = true
+    attribute_name = "expiresAt"
   }
 
   tags = {

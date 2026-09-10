@@ -65,6 +65,7 @@
     "seed:classes": "tsx scripts/seed-resource-classes.ts",
     "backfill:classes": "tsx scripts/backfill-resource-classes.ts",
     "backfill:history": "tsx scripts/backfill-resource-history.ts",
+    "backfill:ttl": "tsx scripts/backfill-ttl.ts",
     "schematics:download": "tsx src/ingest/download-schematics.ts",
     "schematics:ingest": "tsx src/ingest/ingest-schematics.ts",
     "schematics:seed": "tsx scripts/seed-schematics.ts",

@@ -107,8 +107,8 @@ Set up the local development environment: Docker Compose for LocalStack, OpenTof
 - **SQS queues:** `alert-evaluator`, `history-recorder` (+ DLQs for each)
 - **SNS → SQS subscriptions:** fan-out pattern (one event, multiple consumers)
 - **DynamoDB tables:**
-  - `event-log` -- chronological log of all spawn/despawn/data-issue events (partitioned by date). Also stores pipeline metadata records (e.g., `date: "META", sk: "lastSync"` written by the archive step).
-  - `alert-rules` -- single-table pattern with `pk=RULE` for rules and `pk=FIRED` for fired alerts
+  - `event-log` -- chronological log of all spawn/despawn/data-issue events (partitioned by date). Also stores pipeline metadata records (e.g., `date: "META", sk: "lastSync"` written by the archive step). **TTL enabled** (`expiresAt` attribute, 90-day retention) -- event items are automatically deleted after 90 days. The META item has no `expiresAt` and persists indefinitely.
+  - `alert-rules` -- single-table pattern with `pk=RULE` for rules and `pk=FIRED` for fired alerts. **TTL enabled** (`expiresAt` attribute, 30-day retention) -- FIRED items are automatically deleted after 30 days. RULE items have no `expiresAt` and persist indefinitely.
 - **Diff engine:** compare fresh XML against DynamoDB, detect new/removed resources
 - **Ingestion validation:** pipeline and CLI warn on unknown resource classes (DATA_ISSUE events in event-log)
 - **Alert rules CLI:** `npm run alerts:add`, `alerts:list`, `alerts:remove`, `alerts:history`
@@ -368,31 +368,15 @@ npm run frontend:dev       # Start React dev server at http://localhost:3000
 
 ## Recent Changes (Latest Session)
 
-### Schematics & Scoring Feature
-- **Schematic Profile page** (`/schematics/:id`): new page with ingredients, experimental properties, best current/historical resource rankings
-- **Resource Profile redesign**: "Used In Schematics" section replaced chip-based display with collapsible scored list, preCU filter, low-score filter
-- **CLASS# index enrichment**: `seed-schematics.ts` now writes `quality` and `experimentalGroups` to CLASS# index items, enabling inline scoring without per-schematic API calls. Lambda response updated to return these fields. **Requires re-seed after code update** (`npm run schematics:seed`).
-- **Scoring utilities** (`utils/scoring.ts`): 0-1000 scale matching stat display, shared across pages
-- **Batch query hooks** (`useResourcesByClasses`, `useHistoryByClasses`): `useQueries`-based hooks for parallel resource fetching without rules-of-hooks violations
-
-### Bug Fixes
-- **`fetchJson` error handling**: now checks `response.ok` before parsing JSON body -- non-JSON error responses (502, 503) no longer crash with `SyntaxError`
-- **Ops pipeline collapse**: first execution auto-expand now runs once only (was re-expanding on every collapse via `useRef`)
-- **`filteredSchematicCount`**: header count now respects both preCU and low-score filters
-- **Back button safety**: `navigate(-1)` falls back to `/resources` when no browser history exists (direct links/bookmarks)
-- **Resources empty state**: table shows "No resources match" when filters return zero results
-
-### CSS Architecture
-- **Namespaced section titles**: `.section-title` collision resolved -- now `.profile-section-title`, `.alerts-section-title`, `.ops-section-title`
-- **Namespaced empty states**: `.empty-state` collision resolved -- now `.events-empty-state`, `.alerts-empty-state`
-- **Shared styles in theme.css**: `.score--*` tier colors, `.cell-name`/`.cell-class`/`.cell-planets`, `.empty-cell` moved from page CSS to global theme
-- **Convention**: new pages should use page-prefixed class names for any class that might collide (section titles, empty states, etc.)
-
-### UX Improvements
-- **Event resource names** now link to resource profile
-- **Fired alert resource names** now link to resource profile
-- **ClassTreePicker dynamic counts**: shows actual resource counts (aggregated up the tree) instead of static leaf type counts. Resources page always shows real counts; History page falls back to static counts when no filter is active.
-- **ARIA roles**: `role="alert"` on ErrorMessage, `role="status"` + `aria-live="polite"` on LoadingSpinner
+### DynamoDB TTL (Time-To-Live)
+- **TTL enabled on `event-log` table**: SPAWNED, DESPAWNED, and DATA_ISSUE items now include an `expiresAt` attribute set to 90 days from creation. DynamoDB automatically deletes expired items (within ~48 hours of expiry). The META item (`date="META"`, `sk="lastSync"`) has no `expiresAt` and persists indefinitely.
+- **TTL enabled on `alert-rules` table**: FIRED items now include an `expiresAt` attribute set to 30 days from creation. RULE items (alert definitions) have no `expiresAt` and persist indefinitely.
+- **No TTL on `resource-history`**: despawned resource records are a permanent archive (used by Schematic Profile "Historical Best" rankings and historical analysis).
+- **OpenTofu**: added `ttl { enabled = true, attribute_name = "expiresAt" }` to both tables in `tofu/messaging/dynamodb.tf`
+- **Shared TTL helper**: `ttlEpoch(days)` function and retention constants (`EVENT_TTL_DAYS = 90`, `FIRED_ALERT_TTL_DAYS = 30`) added to `src/config.ts`. Lambda handlers inline equivalent helpers.
+- **Code changes**: all event-log writers (CLI `log-events.ts`, Lambda `pipeline-log-events`, Lambda `pipeline-update-db` DATA_ISSUE) and all FIRED alert writers (CLI `process-alerts.ts`, Lambda `alert-evaluator`) now set `expiresAt`.
+- **Existing data**: items written before this change have been retroactively backfilled with `expiresAt` via `npm run backfill:ttl`. Items older than the retention window received an `expiresAt` in the past and will be deleted by DynamoDB within ~48 hours. The backfill script is idempotent and safe to re-run.
+- **No reader changes needed**: DynamoDB handles deletion automatically; expired items stop appearing in query results.
 
 ## Possible Extensions
 
@@ -404,7 +388,7 @@ These teach new AWS concepts while delivering meaningful features.
 
 | Item | New Infra Learned | Feature Value |
 |------|-------------------|---------------|
-| **DynamoDB TTL (Time-To-Live)** | DynamoDB lifecycle management, automatic item expiration | Keeps event-log and history tables from growing unbounded |
+| ~~**DynamoDB TTL (Time-To-Live)**~~ | ~~DynamoDB lifecycle management, automatic item expiration~~ | **DONE** -- event-log (90 days) and alert-rules/FIRED (30 days) auto-expire via `expiresAt` attribute. resource-history intentionally permanent. |
 | **Resource notifications (SNS email)** | SNS email subscriptions, delivery mechanisms | Makes alerts actually *alert* you -- fired alerts trigger real emails |
 | **Lambda layers** | Lambda code sharing pattern | Cleans up duplicated classification cache loading across 5+ Lambdas |
 
@@ -504,7 +488,7 @@ Key cost drivers at scale: API Gateway ($3.50/1M requests), DynamoDB (scales wit
 
 Recommended order for the next sessions, balancing new AWS concepts with practical value:
 
-1. **DynamoDB TTL** -- Quick win, new AWS concept, keeps event-log and history tables bounded. ~1 session.
+1. ~~**DynamoDB TTL**~~ -- **DONE.** Event-log (90 days) and fired alerts (30 days) auto-expire.
 2. **CI/CD pipeline** -- GitHub Actions with LocalStack in Docker. Practical skill for any project. Validates the full build + test chain. ~1-2 sessions.
 3. **Deploy to real AWS** -- Ultimate validation of everything built. Teaches real IAM, real costs, the local-to-cloud gap. ~$0-3/mo. ~1 session.
 4. **Lambda layers** -- Code hygiene, production pattern. Cleans up duplicated classification cache across 5+ Lambdas. ~1 session.

@@ -244,6 +244,10 @@ export interface EventLogItem {
 
   /** Description of the data issue (only for DATA_ISSUE events) */
   issue?: string;
+
+  /** Unix epoch (seconds) when DynamoDB TTL should delete this item.
+   *  Omitted on META items so they persist indefinitely. */
+  expiresAt?: number;
 }
 
 // ─── Schematic types ─────────────────────────────────────────────────

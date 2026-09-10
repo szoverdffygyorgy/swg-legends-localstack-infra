@@ -23,6 +23,16 @@ const BATCH_SIZE = 25;
 
 const ALL_STAT_KEYS = ["er", "cr", "cd", "dr", "fl", "hr", "ma", "pe", "oq", "sr", "ut"];
 
+// ─── TTL ─────────────────────────────────────────────────────────────
+// Event items expire after 90 days. DynamoDB TTL deletes them automatically.
+
+const EVENT_TTL_DAYS = 90;
+
+/** Unix epoch seconds N days from now. */
+function ttlEpoch(days: number): number {
+  return Math.floor(Date.now() / 1000) + days * 24 * 60 * 60;
+}
+
 const s3 = new S3Client({
   endpoint,
   region,
@@ -76,6 +86,7 @@ export async function handler(event: LogEventsInput): Promise<LogEventsOutput> {
   const timestamp = now.toISOString();
 
   const items: Record<string, unknown>[] = [];
+  const expiresAt = ttlEpoch(EVENT_TTL_DAYS);
 
   // Spawn events
   for (const resource of diff.spawned) {
@@ -89,6 +100,7 @@ export async function handler(event: LogEventsInput): Promise<LogEventsOutput> {
       planets: resource.planets.join(", "),
       statSummary: statSummary(resource.stats),
       detectedAt: timestamp,
+      expiresAt,
     });
   }
 
@@ -108,6 +120,7 @@ export async function handler(event: LogEventsInput): Promise<LogEventsOutput> {
       planets: item.allPlanets,
       statSummary: statSummaryFromItem(item),
       detectedAt: timestamp,
+      expiresAt,
     });
   }
 
@@ -124,6 +137,7 @@ export async function handler(event: LogEventsInput): Promise<LogEventsOutput> {
       statSummary: "",
       detectedAt: timestamp,
       issue: issue.issue,
+      expiresAt,
     });
   }
 

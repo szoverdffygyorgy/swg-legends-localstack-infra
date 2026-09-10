@@ -10,7 +10,7 @@
  */
 
 import { BatchWriteCommand } from "@aws-sdk/lib-dynamodb";
-import { createDocClient, EVENT_LOG_TABLE } from "../config.js";
+import { createDocClient, EVENT_LOG_TABLE, EVENT_TTL_DAYS, ttlEpoch } from "../config.js";
 import type { SWGResource, ResourceItem, DiffResult, EventLogItem, StatKey } from "../types.js";
 import { ALL_STAT_KEYS } from "../types.js";
 
@@ -49,6 +49,7 @@ export async function logEvents(diff: DiffResult): Promise<number> {
   const timestamp = now.toISOString();
 
   const items: EventLogItem[] = [];
+  const expiresAt = ttlEpoch(EVENT_TTL_DAYS);
 
   // Spawn events
   for (const resource of diff.spawned) {
@@ -62,6 +63,7 @@ export async function logEvents(diff: DiffResult): Promise<number> {
       planets: resource.planets.join(", "),
       statSummary: statSummaryFromResource(resource),
       detectedAt: timestamp,
+      expiresAt,
     });
   }
 
@@ -81,6 +83,7 @@ export async function logEvents(diff: DiffResult): Promise<number> {
       planets: item.allPlanets,
       statSummary: statSummaryFromItem(item),
       detectedAt: timestamp,
+      expiresAt,
     });
   }
 
@@ -97,6 +100,7 @@ export async function logEvents(diff: DiffResult): Promise<number> {
       statSummary: "",
       detectedAt: timestamp,
       issue: issue.issue,
+      expiresAt,
     });
   }
 

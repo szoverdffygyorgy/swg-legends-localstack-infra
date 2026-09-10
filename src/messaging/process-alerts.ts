@@ -30,6 +30,8 @@ import {
   createDocClient,
   ALERT_EVALUATOR_QUEUE_URL,
   ALERT_RULES_TABLE,
+  FIRED_ALERT_TTL_DAYS,
+  ttlEpoch,
 } from "../config.js";
 import { loadClassCache } from "../ingest/load-resources.js";
 
@@ -156,6 +158,7 @@ async function recordFiredAlert(
         planets: resource.planets.join(", "),
         stats: resource.stats,
         matchedAt: now,
+        expiresAt: ttlEpoch(FIRED_ALERT_TTL_DAYS),
       },
     })
   );
